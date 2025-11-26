@@ -39,7 +39,16 @@ header h1 {
 .lobby {
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  padding: 20px;
+}
+
+.lobby-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  width: 100%;
+  max-width: 1000px;
 }
 
 .card {
@@ -48,7 +57,11 @@ header h1 {
   border-radius: 15px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   width: 100%;
-  max-width: 400px;
+}
+
+.rooms-list-card {
+  max-height: 600px;
+  overflow-y: auto;
 }
 
 .card h2 {
@@ -214,9 +227,99 @@ header h1 {
   padding: 12px 30px;
 }
 
+.rooms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.no-rooms {
+  text-align: center;
+  color: #999;
+  font-style: italic;
+  padding: 20px;
+}
+
+.room-item {
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+  transition: all 0.3s;
+}
+
+.room-item:hover {
+  border-color: #667eea;
+  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.2);
+}
+
+.room-item.full {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.room-id {
+  font-weight: bold;
+  color: #667eea;
+  font-size: 18px;
+}
+
+.room-status {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.room-status.waiting {
+  background: #4CAF50;
+  color: white;
+}
+
+.room-status.full {
+  background: #f44336;
+  color: white;
+}
+
+.room-info {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #666;
+}
+
+.room-players {
+  color: #333;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.room-item .btn {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+}
+
+.room-item .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   header h1 {
     font-size: 2em;
+  }
+
+  .lobby-container {
+    grid-template-columns: 1fr;
   }
 
   .card {

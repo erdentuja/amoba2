@@ -14,27 +14,36 @@
     </header>
 
     <div id="lobby" class="lobby">
-      <div class="card">
-        <h2>Csatlakozás játékhoz</h2>
-        <div class="form-group">
-          <label for="playerName">Neved:</label>
-          <input type="text" id="playerName" placeholder="Add meg a neved" maxlength="20">
+      <div class="lobby-container">
+        <div class="card">
+          <h2>Új szoba létrehozása</h2>
+          <div class="form-group">
+            <label for="playerName">Neved:</label>
+            <input type="text" id="playerName" placeholder="Add meg a neved" maxlength="20">
+          </div>
+          <div class="form-group">
+            <label for="roomId">Szoba azonosító:</label>
+            <input type="text" id="roomId" placeholder="Szoba kód (pl: room1)" maxlength="20">
+          </div>
+          <div class="form-group">
+            <label for="boardSize">Tábla méret:</label>
+            <select id="boardSize" class="board-size-select">
+              <option value="9">9x9 (Kicsi)</option>
+              <option value="13">13x13 (Közepes)</option>
+              <option value="15" selected>15x15 (Standard)</option>
+              <option value="19">19x19 (Nagy)</option>
+            </select>
+          </div>
+          <button id="joinBtn" class="btn btn-primary">Szoba létrehozása / Csatlakozás</button>
+          <p class="hint">Adj meg egy új szoba kódot vagy csatlakozz lent egy meglévő szobához!</p>
         </div>
-        <div class="form-group">
-          <label for="roomId">Szoba azonosító:</label>
-          <input type="text" id="roomId" placeholder="Szoba kód (pl: room1)" maxlength="20">
+
+        <div class="card rooms-list-card">
+          <h2>Várakozó szobák</h2>
+          <div id="roomsList" class="rooms-list">
+            <p class="no-rooms">Jelenleg nincsenek várakozó szobák...</p>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="boardSize">Tábla méret:</label>
-          <select id="boardSize" class="board-size-select">
-            <option value="9">9x9 (Kicsi)</option>
-            <option value="13">13x13 (Közepes)</option>
-            <option value="15" selected>15x15 (Standard)</option>
-            <option value="19">19x19 (Nagy)</option>
-          </select>
-        </div>
-        <button id="joinBtn" class="btn btn-primary">Csatlakozás</button>
-        <p class="hint">Tipp: Oszd meg a szoba kódot egy baráttal, hogy együtt játszhassatok!</p>
       </div>
     </div>
 

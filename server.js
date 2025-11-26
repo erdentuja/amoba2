@@ -134,9 +134,34 @@ class GameRoom {
   }
 }
 
+// Helper function to get rooms list
+function getRoomsList() {
+  const roomsList = [];
+  rooms.forEach((room, roomId) => {
+    roomsList.push({
+      roomId: roomId,
+      playerCount: room.players.length,
+      boardSize: room.boardSize,
+      players: room.players.map(p => p.name),
+      isWaiting: room.players.length === 1,
+      isFull: room.players.length === 2,
+      gameStarted: room.players.length === 2
+    });
+  });
+  return roomsList;
+}
+
+// Broadcast rooms list to all connected clients
+function broadcastRoomsList() {
+  io.emit('roomsList', getRoomsList());
+}
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
+
+  // Send current rooms list to newly connected client
+  socket.emit('roomsList', getRoomsList());
 
   socket.on('joinRoom', ({ roomId, playerName, boardSize }) => {
     if (!rooms.has(roomId)) {
@@ -157,6 +182,9 @@ io.on('connection', (socket) => {
       if (room.players.length === 2) {
         io.to(roomId).emit('message', 'Game started! X goes first.');
       }
+
+      // Broadcast updated rooms list
+      broadcastRoomsList();
     } else {
       socket.emit('error', 'Room is full');
     }
@@ -211,6 +239,9 @@ io.on('connection', (socket) => {
           io.to(socket.roomId).emit('message', `${player?.name || 'Player'} left the game`);
           io.to(socket.roomId).emit('gameState', room.getState());
         }
+
+        // Broadcast updated rooms list
+        broadcastRoomsList();
       }
     }
   });

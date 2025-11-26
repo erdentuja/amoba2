@@ -10,6 +10,7 @@ const playerNameInput = document.getElementById('playerName');
 const roomIdInput = document.getElementById('roomId');
 const boardSizeInput = document.getElementById('boardSize');
 const joinBtn = document.getElementById('joinBtn');
+const roomsListDiv = document.getElementById('roomsList');
 const resetBtn = document.getElementById('resetBtn');
 const leaveBtn = document.getElementById('leaveBtn');
 const canvas = document.getElementById('gameBoard');
@@ -31,6 +32,18 @@ function init() {
   canvas.height = CANVAS_SIZE;
   setupEventListeners();
   drawBoard();
+  initLobbyConnection();
+}
+
+// Initialize lobby connection to receive rooms list
+function initLobbyConnection() {
+  if (!socket) {
+    socket = io();
+
+    socket.on('roomsList', (rooms) => {
+      updateRoomsList(rooms);
+    });
+  }
 }
 
 function setupEventListeners() {
@@ -48,6 +61,49 @@ function setupEventListeners() {
   });
 }
 
+function updateRoomsList(rooms) {
+  const waitingRooms = rooms.filter(room => room.isWaiting);
+
+  if (waitingRooms.length === 0) {
+    roomsListDiv.innerHTML = '<p class="no-rooms">Jelenleg nincsenek várakozó szobák...</p>';
+    return;
+  }
+
+  roomsListDiv.innerHTML = '';
+  waitingRooms.forEach(room => {
+    const roomDiv = document.createElement('div');
+    roomDiv.className = 'room-item';
+    roomDiv.innerHTML = `
+      <div class="room-header">
+        <span class="room-id">🎮 ${room.roomId}</span>
+        <span class="room-status waiting">Várakozik</span>
+      </div>
+      <div class="room-info">
+        <span>👥 ${room.playerCount}/2 játékos</span>
+        <span>📏 ${room.boardSize}x${room.boardSize}</span>
+      </div>
+      <div class="room-players">
+        Játékos: ${room.players.join(', ')}
+      </div>
+      <button class="btn btn-primary" onclick="joinExistingRoom('${room.roomId}')">Csatlakozás</button>
+    `;
+    roomsListDiv.appendChild(roomDiv);
+  });
+}
+
+function joinExistingRoom(roomId) {
+  const playerName = playerNameInput.value.trim();
+
+  if (!playerName) {
+    alert('Kérlek add meg a neved előbb!');
+    playerNameInput.focus();
+    return;
+  }
+
+  roomIdInput.value = roomId;
+  joinGame();
+}
+
 function joinGame() {
   const playerName = playerNameInput.value.trim();
   const roomId = roomIdInput.value.trim();
@@ -63,8 +119,10 @@ function joinGame() {
     return;
   }
 
-  // Initialize socket connection
-  socket = io();
+  // Reuse existing socket or create new one
+  if (!socket) {
+    socket = io();
+  }
   myPlayerId = socket.id;
 
   // Setup socket event listeners
@@ -92,6 +150,10 @@ function joinGame() {
     alert(error);
   });
 
+  socket.on('roomsList', (rooms) => {
+    updateRoomsList(rooms);
+  });
+
   // Show game area
   lobby.style.display = 'none';
   gameArea.style.display = 'block';
@@ -100,10 +162,14 @@ function joinGame() {
 function leaveGame() {
   if (socket) {
     socket.disconnect();
+    socket = null;
   }
   gameArea.style.display = 'none';
   lobby.style.display = 'flex';
   gameState = null;
+
+  // Reconnect to lobby
+  initLobbyConnection();
 }
 
 function resetGame() {
