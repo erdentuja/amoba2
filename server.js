@@ -7,6 +7,12 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 const ADMIN_CODE = process.env.ADMIN_CODE || 'admin123'; // Change this in production!
 
+// Global timer settings (admin configurable)
+let globalTimerSettings = {
+  enabled: false,
+  duration: 60 // seconds
+};
+
 // Track connected clients
 const connectedClients = new Map(); // socketId -> {name, isAdmin, connectedAt, createdRoom}
 const loggedInPlayers = new Map(); // socketId -> {name, loggedInAt}
@@ -32,6 +38,9 @@ class GameRoom {
     this.currentPlayer = 0; // 0 or 1
     this.gameOver = false;
     this.winner = null;
+    this.moveHistory = []; // [{row, col, symbol, player}, ...]
+    this.timer = null;
+    this.timerEndTime = null;
   }
 
   addPlayer(playerId, playerName) {
@@ -55,6 +64,17 @@ class GameRoom {
 
     const symbol = this.players[this.currentPlayer].symbol;
     this.board[row][col] = symbol;
+
+    // Save move to history for undo
+    this.moveHistory.push({
+      row: row,
+      col: col,
+      symbol: symbol,
+      player: this.currentPlayer
+    });
+
+    // Clear any existing timer
+    this.clearTimer();
 
     // Check for win
     if (this.checkWin(row, col, symbol)) {
@@ -122,11 +142,65 @@ class GameRoom {
     return true;
   }
 
+  undoMove() {
+    if (this.moveHistory.length === 0) {
+      return { success: false, error: 'No moves to undo' };
+    }
+
+    if (this.gameOver) {
+      return { success: false, error: 'Cannot undo after game is over' };
+    }
+
+    // Get the last move
+    const lastMove = this.moveHistory.pop();
+
+    // Remove from board
+    this.board[lastMove.row][lastMove.col] = null;
+
+    // Switch back to previous player
+    this.currentPlayer = lastMove.player;
+
+    // Clear timer
+    this.clearTimer();
+
+    return { success: true };
+  }
+
+  clearTimer() {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+      this.timerEndTime = null;
+    }
+  }
+
+  startTimer(callback) {
+    this.clearTimer();
+
+    if (globalTimerSettings.enabled && this.players.length === 2 && !this.gameOver) {
+      this.timerEndTime = Date.now() + (globalTimerSettings.duration * 1000);
+
+      this.timer = setTimeout(() => {
+        // Time's up! Skip turn
+        this.currentPlayer = 1 - this.currentPlayer;
+        callback();
+      }, globalTimerSettings.duration * 1000);
+    }
+  }
+
+  getTimerRemaining() {
+    if (!this.timerEndTime) return null;
+    const remaining = Math.max(0, Math.ceil((this.timerEndTime - Date.now()) / 1000));
+    return remaining;
+  }
+
   reset() {
     this.board = Array(this.boardSize).fill(null).map(() => Array(this.boardSize).fill(null));
     this.currentPlayer = 0;
     this.gameOver = false;
     this.winner = null;
+    this.moveHistory = [];
+    this.clearTimer();
   }
 
   getState() {
@@ -136,7 +210,11 @@ class GameRoom {
       players: this.players,
       currentPlayer: this.currentPlayer,
       gameOver: this.gameOver,
-      winner: this.winner
+      winner: this.winner,
+      canUndo: this.moveHistory.length > 0 && !this.gameOver,
+      timerEnabled: globalTimerSettings.enabled,
+      timerDuration: globalTimerSettings.duration,
+      timerRemaining: this.getTimerRemaining()
     };
   }
 }
@@ -300,6 +378,12 @@ io.on('connection', (socket) => {
 
       if (room.players.length === 2) {
         io.to(roomId).emit('message', 'Játék elindult! X kezd.');
+
+        // Start timer for first player
+        room.startTimer(() => {
+          io.to(roomId).emit('message', 'Idő lejárt! Kör átugrva.');
+          io.to(roomId).emit('gameState', room.getState());
+        });
       }
 
       // Broadcast updated rooms list
@@ -329,7 +413,42 @@ io.on('connection', (socket) => {
         } else {
           io.to(socket.roomId).emit('message', `${result.winner.name} wins!`);
         }
+      } else {
+        // Start timer for next player
+        room.startTimer(() => {
+          // Timer expired callback
+          io.to(socket.roomId).emit('message', 'Idő lejárt! Kör átugrva.');
+          io.to(socket.roomId).emit('gameState', room.getState());
+
+          // Start timer for the next player
+          room.startTimer(() => {
+            io.to(socket.roomId).emit('message', 'Idő lejárt! Kör átugrva.');
+            io.to(socket.roomId).emit('gameState', room.getState());
+          });
+        });
       }
+    } else {
+      socket.emit('error', result.error);
+    }
+  });
+
+  socket.on('undoMove', () => {
+    if (!socket.roomId) return;
+
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+
+    const result = room.undoMove();
+
+    if (result.success) {
+      io.to(socket.roomId).emit('message', 'Lépés visszavonva!');
+      io.to(socket.roomId).emit('gameState', room.getState());
+
+      // Restart timer for current player
+      room.startTimer(() => {
+        io.to(socket.roomId).emit('message', 'Idő lejárt! Kör átugrva.');
+        io.to(socket.roomId).emit('gameState', room.getState());
+      });
     } else {
       socket.emit('error', result.error);
     }
@@ -386,6 +505,48 @@ io.on('connection', (socket) => {
       broadcastOnlinePlayers();
       console.log(`Admin ${socket.id} closed room ${roomId}`);
     }
+  });
+
+  // Admin: Get timer settings
+  socket.on('adminGetTimerSettings', () => {
+    const client = connectedClients.get(socket.id);
+    if (!client || !client.isAdmin) {
+      socket.emit('error', 'Unauthorized');
+      return;
+    }
+
+    socket.emit('timerSettings', globalTimerSettings);
+  });
+
+  // Admin: Set timer settings
+  socket.on('adminSetTimer', ({ enabled, duration }) => {
+    const client = connectedClients.get(socket.id);
+    if (!client || !client.isAdmin) {
+      socket.emit('error', 'Unauthorized');
+      return;
+    }
+
+    if (typeof enabled === 'boolean') {
+      globalTimerSettings.enabled = enabled;
+    }
+
+    if (typeof duration === 'number' && duration > 0 && duration <= 300) {
+      globalTimerSettings.duration = duration;
+    }
+
+    // Broadcast to all admins
+    connectedClients.forEach((c, sid) => {
+      if (c.isAdmin) {
+        io.to(sid).emit('timerSettings', globalTimerSettings);
+      }
+    });
+
+    // Update all active rooms
+    rooms.forEach(room => {
+      io.to(room.roomId).emit('gameState', room.getState());
+    });
+
+    console.log('Timer settings updated:', globalTimerSettings);
   });
 
   socket.on('disconnect', () => {

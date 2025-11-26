@@ -281,6 +281,57 @@ header h1 {
   background: #999 !important;
 }
 
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Timer styles */
+.timer {
+  text-align: center;
+  padding: 15px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+  margin-bottom: 15px;
+  box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+}
+
+.timer-icon {
+  font-size: 24px;
+  margin-right: 10px;
+}
+
+.timer-display {
+  font-size: 28px;
+  font-weight: bold;
+  color: white;
+  font-family: 'Courier New', monospace;
+}
+
+/* Admin timer settings */
+.timer-settings {
+  background: #f9f9f9;
+  padding: 20px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+}
+
+.timer-settings .form-group label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.timer-settings input[type="checkbox"] {
+  width: auto;
+  cursor: pointer;
+}
+
+.timer-settings input[type="number"] {
+  width: 100%;
+}
+
 .rooms-list {
   display: flex;
   flex-direction: column;
@@ -441,8 +492,24 @@ header h1 {
 
 .admin-content {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 30px;
+}
+
+@media (min-width: 1200px) {
+  .admin-content {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .admin-content {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-content .admin-section:first-child {
+    grid-column: 1 / -1;
+  }
 }
 
 .admin-section h3 {

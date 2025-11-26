@@ -13,6 +13,7 @@ const roomIdInput = document.getElementById('roomId');
 const boardSizeInput = document.getElementById('boardSize');
 const createRoomBtn = document.getElementById('createRoomBtn');
 const roomsListDiv = document.getElementById('roomsList');
+const undoBtn = document.getElementById('undoBtn');
 const resetBtn = document.getElementById('resetBtn');
 const leaveBtn = document.getElementById('leaveBtn');
 const canvas = document.getElementById('gameBoard');
@@ -21,6 +22,8 @@ const currentTurnDiv = document.getElementById('currentTurn');
 const messagesDiv = document.getElementById('messages');
 const player1Info = document.getElementById('player1Info');
 const player2Info = document.getElementById('player2Info');
+const timerDiv = document.getElementById('timer');
+const timerDisplay = document.getElementById('timerDisplay');
 
 // Game state
 let socket = null;
@@ -29,6 +32,7 @@ let myPlayerId = null;
 let myPlayerName = null;
 let isLoggedIn = false;
 let isAdmin = false;
+let timerInterval = null;
 
 // Sound system
 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -199,6 +203,7 @@ function setupEventListeners() {
   });
 
   // Game controls
+  undoBtn.addEventListener('click', undoMove);
   resetBtn.addEventListener('click', resetGame);
   leaveBtn.addEventListener('click', leaveGame);
   canvas.addEventListener('click', handleCanvasClick);
@@ -325,14 +330,61 @@ function leaveGame() {
     socket.roomId = null;
   }
 
+  stopTimer();
   gameArea.style.display = 'none';
   lobby.style.display = 'flex';
   gameState = null;
 }
 
+function undoMove() {
+  if (socket) {
+    socket.emit('undoMove');
+  }
+}
+
 function resetGame() {
   if (socket) {
     socket.emit('resetGame');
+  }
+}
+
+// Timer functions
+function startTimer() {
+  stopTimer();
+
+  timerInterval = setInterval(() => {
+    if (gameState && gameState.timerEnabled && gameState.timerRemaining !== null) {
+      updateTimerDisplay(gameState.timerRemaining);
+    }
+  }, 100); // Update every 100ms for smooth countdown
+}
+
+function stopTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+function updateTimerDisplay(seconds) {
+  if (seconds === null || seconds === undefined) {
+    timerDiv.style.display = 'none';
+    return;
+  }
+
+  timerDiv.style.display = 'block';
+  timerDisplay.textContent = `${seconds}s`;
+
+  // Change color based on remaining time
+  if (seconds <= 10) {
+    timerDisplay.style.color = '#e74c3c';
+    timerDisplay.style.fontWeight = 'bold';
+  } else if (seconds <= 30) {
+    timerDisplay.style.color = '#f39c12';
+    timerDisplay.style.fontWeight = 'normal';
+  } else {
+    timerDisplay.style.color = '#2ecc71';
+    timerDisplay.style.fontWeight = 'normal';
   }
 }
 
@@ -389,6 +441,22 @@ function updateGameDisplay() {
     const currentPlayer = gameState.players[gameState.currentPlayer];
     currentTurnDiv.textContent = `${currentPlayer.name} következik (${currentPlayer.symbol})`;
     currentTurnDiv.style.color = '#667eea';
+  }
+
+  // Update undo button
+  if (undoBtn) {
+    undoBtn.disabled = !gameState.canUndo;
+  }
+
+  // Update timer
+  if (gameState.timerEnabled && gameState.timerRemaining !== null) {
+    updateTimerDisplay(gameState.timerRemaining);
+    if (!timerInterval) {
+      startTimer();
+    }
+  } else {
+    timerDiv.style.display = 'none';
+    stopTimer();
   }
 
   // Draw the board
@@ -499,6 +567,9 @@ const onlinePlayersListDiv = document.getElementById('onlinePlayersList');
 const adminRoomsListDiv = document.getElementById('adminRoomsList');
 const onlineCountSpan = document.getElementById('onlineCount');
 const roomsCountSpan = document.getElementById('roomsCount');
+const timerEnabledCheckbox = document.getElementById('timerEnabled');
+const timerDurationInput = document.getElementById('timerDuration');
+const saveTimerBtn = document.getElementById('saveTimerBtn');
 
 // Admin modal controls
 adminLoginBtn.addEventListener('click', () => {
@@ -536,6 +607,18 @@ adminLogoutBtn.addEventListener('click', () => {
   location.reload();
 });
 
+saveTimerBtn.addEventListener('click', () => {
+  const enabled = timerEnabledCheckbox.checked;
+  const duration = parseInt(timerDurationInput.value);
+
+  if (duration < 10 || duration > 300) {
+    alert('Az időtartamnak 10 és 300 másodperc között kell lennie!');
+    return;
+  }
+
+  socket.emit('adminSetTimer', { enabled, duration });
+});
+
 // Handle admin login response
 function setupAdminListeners() {
   socket.on('adminLoginSuccess', () => {
@@ -546,6 +629,9 @@ function setupAdminListeners() {
     adminLoginBtn.style.display = 'none';
     lobby.style.display = 'none';
     gameArea.style.display = 'none';
+
+    // Request timer settings
+    socket.emit('adminGetTimerSettings');
   });
 
   socket.on('adminLoginFailed', ({ error }) => {
@@ -572,6 +658,13 @@ function setupAdminListeners() {
   socket.on('roomClosed', ({ message }) => {
     alert(message);
     leaveGame();
+  });
+
+  socket.on('timerSettings', (settings) => {
+    if (timerEnabledCheckbox && timerDurationInput) {
+      timerEnabledCheckbox.checked = settings.enabled;
+      timerDurationInput.value = settings.duration;
+    }
   });
 }
 
