@@ -276,6 +276,11 @@ header h1 {
   padding: 12px 30px;
 }
 
+.btn.sound-off {
+  opacity: 0.6;
+  background: #999 !important;
+}
+
 .rooms-list {
   display: flex;
   flex-direction: column;

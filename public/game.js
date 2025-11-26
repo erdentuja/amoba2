@@ -30,14 +30,124 @@ let myPlayerName = null;
 let isLoggedIn = false;
 let isAdmin = false;
 
+// Sound system
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioContext = new AudioContext();
+let soundEnabled = true;
+
+// Sound effects using Web Audio API
+const sounds = {
+  click: () => {
+    if (!soundEnabled) return;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.1);
+  },
+
+  win: () => {
+    if (!soundEnabled) return;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'triangle';
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+    // Victory melody
+    const notes = [523, 659, 784, 1047]; // C, E, G, C
+    notes.forEach((freq, i) => {
+      oscillator.frequency.setValueAtTime(freq, audioContext.currentTime + i * 0.15);
+    });
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.6);
+  },
+
+  gameStart: () => {
+    if (!soundEnabled) return;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(554, audioContext.currentTime + 0.1);
+
+    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.2);
+  },
+
+  error: () => {
+    if (!soundEnabled) return;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'sawtooth';
+    oscillator.frequency.value = 200;
+
+    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.15);
+  }
+};
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  const soundBtn = document.getElementById('soundToggle');
+  if (soundBtn) {
+    soundBtn.textContent = soundEnabled ? '🔊 Hang BE' : '🔇 Hang KI';
+    soundBtn.classList.toggle('sound-off', !soundEnabled);
+  }
+  localStorage.setItem('soundEnabled', soundEnabled);
+}
+
 // Initialize
 function init() {
   // Set initial canvas size
   canvas.width = CANVAS_SIZE;
   canvas.height = CANVAS_SIZE;
+
+  // Load sound preference
+  const savedSound = localStorage.getItem('soundEnabled');
+  if (savedSound !== null) {
+    soundEnabled = savedSound === 'true';
+  }
+
   setupEventListeners();
   drawBoard();
   initSocketConnection();
+
+  // Initialize sound button state
+  const soundBtn = document.getElementById('soundToggle');
+  if (soundBtn) {
+    soundBtn.textContent = soundEnabled ? '🔊 Hang BE' : '🔇 Hang KI';
+    soundBtn.classList.toggle('sound-off', !soundEnabled);
+  }
 }
 
 // Initialize socket connection
@@ -67,6 +177,7 @@ function initSocketConnection() {
 
     // Handle errors
     socket.on('error', (error) => {
+      sounds.error();
       alert(error);
     });
 
@@ -171,7 +282,11 @@ function joinExistingRoom(roomId) {
 
   // Setup game state listener
   socket.on('gameState', (state) => {
+    const wasGameOver = gameState && gameState.gameOver;
+    const playersChanged = !gameState || gameState.players.length !== state.players.length;
+
     gameState = state;
+
     // Update board size from server
     if (state.boardSize) {
       BOARD_SIZE = state.boardSize;
@@ -179,6 +294,19 @@ function joinExistingRoom(roomId) {
       canvas.width = CANVAS_SIZE;
       canvas.height = CANVAS_SIZE;
     }
+
+    // Play sounds
+    if (state.gameOver && !wasGameOver) {
+      // Game just ended
+      sounds.win();
+    } else if (playersChanged && state.players.length === 2) {
+      // Game started (2 players joined)
+      sounds.gameStart();
+    } else if (state.board && !wasGameOver) {
+      // Regular move
+      sounds.click();
+    }
+
     updateGameDisplay();
   });
 
@@ -219,6 +347,10 @@ function handleCanvasClick(e) {
   const row = Math.floor(y / CELL_SIZE);
 
   if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
+    // Resume audio context if suspended (browser autoplay policy)
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
     socket.emit('makeMove', { row, col });
   }
 }
