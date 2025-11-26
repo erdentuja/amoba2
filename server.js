@@ -5,6 +5,10 @@ const io = require('socket.io')(http);
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
+const ADMIN_CODE = process.env.ADMIN_CODE || 'admin123'; // Change this in production!
+
+// Track connected clients
+const connectedClients = new Map(); // socketId -> {name, isAdmin, connectedAt}
 
 // Serve static files
 app.use(express.static('public'));
@@ -156,12 +160,60 @@ function broadcastRoomsList() {
   io.emit('roomsList', getRoomsList());
 }
 
+// Get online players list
+function getOnlinePlayersList() {
+  const players = [];
+  connectedClients.forEach((client, socketId) => {
+    players.push({
+      socketId: socketId,
+      name: client.name,
+      isAdmin: client.isAdmin,
+      connectedAt: client.connectedAt,
+      room: client.room || null
+    });
+  });
+  return players;
+}
+
+// Broadcast online players list to admins
+function broadcastOnlinePlayers() {
+  const playersList = getOnlinePlayersList();
+  connectedClients.forEach((client, socketId) => {
+    if (client.isAdmin) {
+      io.to(socketId).emit('onlinePlayers', playersList);
+    }
+  });
+}
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
+  // Add to connected clients (as guest initially)
+  connectedClients.set(socket.id, {
+    name: 'Guest',
+    isAdmin: false,
+    connectedAt: new Date()
+  });
+
   // Send current rooms list to newly connected client
   socket.emit('roomsList', getRoomsList());
+
+  // Admin login
+  socket.on('adminLogin', ({ adminCode }) => {
+    if (adminCode === ADMIN_CODE) {
+      const client = connectedClients.get(socket.id);
+      if (client) {
+        client.isAdmin = true;
+        client.name = 'Admin';
+        socket.emit('adminLoginSuccess', { isAdmin: true });
+        socket.emit('onlinePlayers', getOnlinePlayersList());
+        console.log('Admin logged in:', socket.id);
+      }
+    } else {
+      socket.emit('adminLoginFailed', { error: 'Invalid admin code' });
+    }
+  });
 
   socket.on('joinRoom', ({ roomId, playerName, boardSize }) => {
     if (!rooms.has(roomId)) {
@@ -176,6 +228,13 @@ io.on('connection', (socket) => {
       socket.join(roomId);
       socket.roomId = roomId;
 
+      // Update connected client info
+      const client = connectedClients.get(socket.id);
+      if (client) {
+        client.name = playerName;
+        client.room = roomId;
+      }
+
       io.to(roomId).emit('gameState', room.getState());
       io.to(roomId).emit('message', `${playerName || 'Player'} joined the game`);
 
@@ -185,6 +244,7 @@ io.on('connection', (socket) => {
 
       // Broadcast updated rooms list
       broadcastRoomsList();
+      broadcastOnlinePlayers();
     } else {
       socket.emit('error', 'Room is full');
     }
@@ -224,8 +284,53 @@ io.on('connection', (socket) => {
     io.to(socket.roomId).emit('message', 'Game reset! X goes first.');
   });
 
+  // Admin: Kick player
+  socket.on('adminKickPlayer', ({ targetSocketId }) => {
+    const client = connectedClients.get(socket.id);
+    if (!client || !client.isAdmin) {
+      socket.emit('error', 'Unauthorized');
+      return;
+    }
+
+    const targetSocket = io.sockets.sockets.get(targetSocketId);
+    if (targetSocket) {
+      targetSocket.emit('kicked', { message: 'You have been kicked by an admin' });
+      targetSocket.disconnect(true);
+      console.log(`Admin ${socket.id} kicked player ${targetSocketId}`);
+    }
+  });
+
+  // Admin: Close room
+  socket.on('adminCloseRoom', ({ roomId }) => {
+    const client = connectedClients.get(socket.id);
+    if (!client || !client.isAdmin) {
+      socket.emit('error', 'Unauthorized');
+      return;
+    }
+
+    const room = rooms.get(roomId);
+    if (room) {
+      // Kick all players from the room
+      room.players.forEach(player => {
+        const playerSocket = io.sockets.sockets.get(player.id);
+        if (playerSocket) {
+          playerSocket.emit('roomClosed', { message: 'Room has been closed by an admin' });
+          playerSocket.leave(roomId);
+        }
+      });
+
+      rooms.delete(roomId);
+      broadcastRoomsList();
+      broadcastOnlinePlayers();
+      console.log(`Admin ${socket.id} closed room ${roomId}`);
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
+
+    // Remove from connected clients
+    connectedClients.delete(socket.id);
 
     if (socket.roomId) {
       const room = rooms.get(socket.roomId);
@@ -244,6 +349,9 @@ io.on('connection', (socket) => {
         broadcastRoomsList();
       }
     }
+
+    // Broadcast updated online players list to admins
+    broadcastOnlinePlayers();
   });
 });
 

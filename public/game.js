@@ -24,6 +24,7 @@ const player2Info = document.getElementById('player2Info');
 let socket = null;
 let gameState = null;
 let myPlayerId = null;
+let isAdmin = false;
 
 // Initialize
 function init() {
@@ -43,6 +44,8 @@ function initLobbyConnection() {
     socket.on('roomsList', (rooms) => {
       updateRoomsList(rooms);
     });
+
+    setupAdminListeners();
   }
 }
 
@@ -323,6 +326,152 @@ function showMessage(msg) {
   setTimeout(() => {
     messagesDiv.textContent = '';
   }, 5000);
+}
+
+// Admin functionality
+const adminLoginBtn = document.getElementById('adminLoginBtn');
+const adminModal = document.getElementById('adminModal');
+const adminCodeInput = document.getElementById('adminCodeInput');
+const adminSubmitBtn = document.getElementById('adminSubmitBtn');
+const closeModalBtn = document.querySelector('.close');
+const adminPanel = document.getElementById('adminPanel');
+const adminLogoutBtn = document.getElementById('adminLogoutBtn');
+const onlinePlayersListDiv = document.getElementById('onlinePlayersList');
+const adminRoomsListDiv = document.getElementById('adminRoomsList');
+const onlineCountSpan = document.getElementById('onlineCount');
+const roomsCountSpan = document.getElementById('roomsCount');
+
+// Admin modal controls
+adminLoginBtn.addEventListener('click', () => {
+  adminModal.style.display = 'flex';
+});
+
+closeModalBtn.addEventListener('click', () => {
+  adminModal.style.display = 'none';
+});
+
+window.addEventListener('click', (e) => {
+  if (e.target === adminModal) {
+    adminModal.style.display = 'none';
+  }
+});
+
+adminSubmitBtn.addEventListener('click', () => {
+  const code = adminCodeInput.value.trim();
+  if (code && socket) {
+    socket.emit('adminLogin', { adminCode: code });
+  }
+});
+
+adminCodeInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    adminSubmitBtn.click();
+  }
+});
+
+adminLogoutBtn.addEventListener('click', () => {
+  isAdmin = false;
+  adminPanel.style.display = 'none';
+  adminLoginBtn.style.display = 'block';
+  lobby.style.display = 'flex';
+  location.reload();
+});
+
+// Handle admin login response
+function setupAdminListeners() {
+  socket.on('adminLoginSuccess', () => {
+    isAdmin = true;
+    adminModal.style.display = 'none';
+    adminCodeInput.value = '';
+    adminPanel.style.display = 'block';
+    adminLoginBtn.style.display = 'none';
+    lobby.style.display = 'none';
+    gameArea.style.display = 'none';
+  });
+
+  socket.on('adminLoginFailed', ({ error }) => {
+    alert(error || 'Helytelen admin kód');
+    adminCodeInput.value = '';
+  });
+
+  socket.on('onlinePlayers', (players) => {
+    updateOnlinePlayersList(players);
+  });
+
+  socket.on('roomsList', (rooms) => {
+    if (isAdmin) {
+      updateAdminRoomsList(rooms);
+    }
+    updateRoomsList(rooms);
+  });
+
+  socket.on('kicked', ({ message }) => {
+    alert(message);
+    location.reload();
+  });
+
+  socket.on('roomClosed', ({ message }) => {
+    alert(message);
+    leaveGame();
+  });
+}
+
+function updateOnlinePlayersList(players) {
+  onlineCountSpan.textContent = players.length;
+
+  if (players.length === 0) {
+    onlinePlayersListDiv.innerHTML = '<p style="text-align: center; color: #999;">Nincs online játékos</p>';
+    return;
+  }
+
+  onlinePlayersListDiv.innerHTML = '';
+  players.forEach(player => {
+    const div = document.createElement('div');
+    div.className = 'admin-item';
+    div.innerHTML = `
+      <div class="admin-item-info">
+        <span class="admin-item-name">${player.isAdmin ? '🛡️ ' : ''}${player.name}</span>
+        <span class="admin-item-detail">Szoba: ${player.room || 'Lobby'}</span>
+      </div>
+      ${!player.isAdmin ? `<button class="btn btn-danger" onclick="kickPlayer('${player.socketId}')">Kick</button>` : ''}
+    `;
+    onlinePlayersListDiv.appendChild(div);
+  });
+}
+
+function updateAdminRoomsList(rooms) {
+  roomsCountSpan.textContent = rooms.length;
+
+  if (rooms.length === 0) {
+    adminRoomsListDiv.innerHTML = '<p style="text-align: center; color: #999;">Nincs aktív szoba</p>';
+    return;
+  }
+
+  adminRoomsListDiv.innerHTML = '';
+  rooms.forEach(room => {
+    const div = document.createElement('div');
+    div.className = 'admin-item';
+    div.innerHTML = `
+      <div class="admin-item-info">
+        <span class="admin-item-name">🎮 ${room.roomId}</span>
+        <span class="admin-item-detail">${room.playerCount}/2 játékos | ${room.boardSize}x${room.boardSize}</span>
+      </div>
+      <button class="btn btn-danger" onclick="closeRoom('${room.roomId}')">Bezár</button>
+    `;
+    adminRoomsListDiv.appendChild(div);
+  });
+}
+
+function kickPlayer(socketId) {
+  if (confirm('Biztosan kickelni szeretnéd ezt a játékost?')) {
+    socket.emit('adminKickPlayer', { targetSocketId: socketId });
+  }
+}
+
+function closeRoom(roomId) {
+  if (confirm(`Biztosan bezárod a(z) "${roomId}" szobát?`)) {
+    socket.emit('adminCloseRoom', { roomId });
+  }
 }
 
 // Start the game

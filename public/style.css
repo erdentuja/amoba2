@@ -23,6 +23,7 @@ header {
   text-align: center;
   color: white;
   margin-bottom: 30px;
+  position: relative;
 }
 
 header h1 {
@@ -34,6 +35,26 @@ header h1 {
 .subtitle {
   font-size: 1.2em;
   opacity: 0.9;
+}
+
+.admin-login-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.admin-login-btn:hover {
+  background: white;
+  color: #667eea;
 }
 
 .lobby {
@@ -313,12 +334,143 @@ header h1 {
   cursor: not-allowed;
 }
 
+/* Modal styles */
+.modal {
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: white;
+  padding: 40px;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  max-width: 400px;
+  width: 90%;
+}
+
+.modal-content h2 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.modal-content input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.close {
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+  color: #aaa;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: #000;
+}
+
+/* Admin Panel */
+.admin-panel {
+  background: white;
+  border-radius: 15px;
+  padding: 30px;
+  margin-bottom: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.admin-header h2 {
+  color: #333;
+  margin: 0;
+}
+
+.admin-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+
+.admin-section h3 {
+  color: #555;
+  margin-bottom: 15px;
+}
+
+.admin-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.admin-item {
+  background: #f9f9f9;
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-item-info {
+  flex: 1;
+}
+
+.admin-item-name {
+  font-weight: bold;
+  color: #333;
+  display: block;
+}
+
+.admin-item-detail {
+  font-size: 12px;
+  color: #666;
+}
+
+.admin-item .btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
 @media (max-width: 768px) {
   header h1 {
     font-size: 2em;
   }
 
+  .admin-login-btn {
+    position: static;
+    margin-top: 10px;
+  }
+
   .lobby-container {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-content {
     grid-template-columns: 1fr;
   }
 

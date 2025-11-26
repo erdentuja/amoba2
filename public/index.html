@@ -11,7 +11,36 @@
     <header>
       <h1>🎮 Amőba Online</h1>
       <p class="subtitle">5-öt egy sorba - Gomoku</p>
+      <button id="adminLoginBtn" class="admin-login-btn">🔑 Admin</button>
     </header>
+
+    <!-- Admin Login Modal -->
+    <div id="adminModal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Admin Bejelentkezés</h2>
+        <input type="password" id="adminCodeInput" placeholder="Admin kód" maxlength="50">
+        <button id="adminSubmitBtn" class="btn btn-primary">Bejelentkezés</button>
+      </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="adminPanel" class="admin-panel" style="display: none;">
+      <div class="admin-header">
+        <h2>🛡️ Admin Panel</h2>
+        <button id="adminLogoutBtn" class="btn btn-danger">Kilépés</button>
+      </div>
+      <div class="admin-content">
+        <div class="admin-section">
+          <h3>Online Játékosok (<span id="onlineCount">0</span>)</h3>
+          <div id="onlinePlayersList" class="admin-list"></div>
+        </div>
+        <div class="admin-section">
+          <h3>Aktív Szobák (<span id="roomsCount">0</span>)</h3>
+          <div id="adminRoomsList" class="admin-list"></div>
+        </div>
+      </div>
+    </div>
 
     <div id="lobby" class="lobby">
       <div class="lobby-container">
