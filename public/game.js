@@ -26,6 +26,9 @@ let myPlayerId = null;
 
 // Initialize
 function init() {
+  // Set initial canvas size
+  canvas.width = CANVAS_SIZE;
+  canvas.height = CANVAS_SIZE;
   setupEventListeners();
   drawBoard();
 }
