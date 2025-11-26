@@ -1,13 +1,14 @@
 // Game constants
-const BOARD_SIZE = 15;
 const CELL_SIZE = 50;
-const CANVAS_SIZE = BOARD_SIZE * CELL_SIZE;
+let BOARD_SIZE = 15;
+let CANVAS_SIZE = BOARD_SIZE * CELL_SIZE;
 
 // DOM elements
 const lobby = document.getElementById('lobby');
 const gameArea = document.getElementById('gameArea');
 const playerNameInput = document.getElementById('playerName');
 const roomIdInput = document.getElementById('roomId');
+const boardSizeInput = document.getElementById('boardSize');
 const joinBtn = document.getElementById('joinBtn');
 const resetBtn = document.getElementById('resetBtn');
 const leaveBtn = document.getElementById('leaveBtn');
@@ -47,6 +48,7 @@ function setupEventListeners() {
 function joinGame() {
   const playerName = playerNameInput.value.trim();
   const roomId = roomIdInput.value.trim();
+  const boardSize = parseInt(boardSizeInput.value);
 
   if (!playerName) {
     alert('Kérlek add meg a neved!');
@@ -64,11 +66,18 @@ function joinGame() {
 
   // Setup socket event listeners
   socket.on('connect', () => {
-    socket.emit('joinRoom', { roomId, playerName });
+    socket.emit('joinRoom', { roomId, playerName, boardSize });
   });
 
   socket.on('gameState', (state) => {
     gameState = state;
+    // Update board size from server
+    if (state.boardSize) {
+      BOARD_SIZE = state.boardSize;
+      CANVAS_SIZE = BOARD_SIZE * CELL_SIZE;
+      canvas.width = CANVAS_SIZE;
+      canvas.height = CANVAS_SIZE;
+    }
     updateGameDisplay();
   });
 
@@ -179,9 +188,16 @@ function drawBoard() {
   }
 
   // Draw star points (traditional Go board style)
-  const starPoints = [
-    [3, 3], [3, 11], [11, 3], [11, 11], [7, 7]
-  ];
+  let starPoints = [];
+  if (BOARD_SIZE === 9) {
+    starPoints = [[2, 2], [2, 6], [6, 2], [6, 6], [4, 4]];
+  } else if (BOARD_SIZE === 13) {
+    starPoints = [[3, 3], [3, 9], [9, 3], [9, 9], [6, 6]];
+  } else if (BOARD_SIZE === 15) {
+    starPoints = [[3, 3], [3, 11], [11, 3], [11, 11], [7, 7]];
+  } else if (BOARD_SIZE === 19) {
+    starPoints = [[3, 3], [3, 9], [3, 15], [9, 3], [9, 9], [9, 15], [15, 3], [15, 9], [15, 15]];
+  }
   ctx.fillStyle = '#333';
   starPoints.forEach(([row, col]) => {
     ctx.beginPath();

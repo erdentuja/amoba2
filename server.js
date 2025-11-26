@@ -15,13 +15,13 @@ app.get('/', (req, res) => {
 
 // Game state management
 const rooms = new Map();
-const BOARD_SIZE = 15;
 
 class GameRoom {
-  constructor(roomId) {
+  constructor(roomId, boardSize = 15) {
     this.roomId = roomId;
+    this.boardSize = boardSize;
     this.players = [];
-    this.board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+    this.board = Array(boardSize).fill(null).map(() => Array(boardSize).fill(null));
     this.currentPlayer = 0; // 0 or 1
     this.gameOver = false;
     this.winner = null;
@@ -43,7 +43,7 @@ class GameRoom {
     if (this.gameOver) return { success: false, error: 'Game is over' };
     if (this.players.length < 2) return { success: false, error: 'Waiting for opponent' };
     if (this.players[this.currentPlayer].id !== playerId) return { success: false, error: 'Not your turn' };
-    if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) return { success: false, error: 'Invalid position' };
+    if (row < 0 || row >= this.boardSize || col < 0 || col >= this.boardSize) return { success: false, error: 'Invalid position' };
     if (this.board[row][col] !== null) return { success: false, error: 'Cell already occupied' };
 
     const symbol = this.players[this.currentPlayer].symbol;
@@ -82,7 +82,7 @@ class GameRoom {
       for (let i = 1; i < 5; i++) {
         const newRow = row + dx * i;
         const newCol = col + dy * i;
-        if (newRow >= 0 && newRow < BOARD_SIZE && newCol >= 0 && newCol < BOARD_SIZE && this.board[newRow][newCol] === symbol) {
+        if (newRow >= 0 && newRow < this.boardSize && newCol >= 0 && newCol < this.boardSize && this.board[newRow][newCol] === symbol) {
           count++;
         } else {
           break;
@@ -93,7 +93,7 @@ class GameRoom {
       for (let i = 1; i < 5; i++) {
         const newRow = row - dx * i;
         const newCol = col - dy * i;
-        if (newRow >= 0 && newRow < BOARD_SIZE && newCol >= 0 && newCol < BOARD_SIZE && this.board[newRow][newCol] === symbol) {
+        if (newRow >= 0 && newRow < this.boardSize && newCol >= 0 && newCol < this.boardSize && this.board[newRow][newCol] === symbol) {
           count++;
         } else {
           break;
@@ -107,8 +107,8 @@ class GameRoom {
   }
 
   isBoardFull() {
-    for (let i = 0; i < BOARD_SIZE; i++) {
-      for (let j = 0; j < BOARD_SIZE; j++) {
+    for (let i = 0; i < this.boardSize; i++) {
+      for (let j = 0; j < this.boardSize; j++) {
         if (this.board[i][j] === null) return false;
       }
     }
@@ -116,7 +116,7 @@ class GameRoom {
   }
 
   reset() {
-    this.board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+    this.board = Array(this.boardSize).fill(null).map(() => Array(this.boardSize).fill(null));
     this.currentPlayer = 0;
     this.gameOver = false;
     this.winner = null;
@@ -125,6 +125,7 @@ class GameRoom {
   getState() {
     return {
       board: this.board,
+      boardSize: this.boardSize,
       players: this.players,
       currentPlayer: this.currentPlayer,
       gameOver: this.gameOver,
@@ -137,9 +138,10 @@ class GameRoom {
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  socket.on('joinRoom', ({ roomId, playerName }) => {
+  socket.on('joinRoom', ({ roomId, playerName, boardSize }) => {
     if (!rooms.has(roomId)) {
-      rooms.set(roomId, new GameRoom(roomId));
+      const size = boardSize || 15;
+      rooms.set(roomId, new GameRoom(roomId, size));
     }
 
     const room = rooms.get(roomId);
