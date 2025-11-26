@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  amoba-game:
+    build: .
+    container_name: amoba-online
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - ADMIN_CODE=admin123
+    networks:
+      - amoba-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+networks:
+  amoba-network:
+    driver: bridge
