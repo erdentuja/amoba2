@@ -42,14 +42,24 @@
       </div>
     </div>
 
-    <div id="lobby" class="lobby">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+      <div class="login-card">
+        <h2>🎮 Bejelentkezés</h2>
+        <p>Add meg a neved a játékhoz</p>
+        <div class="form-group">
+          <label for="loginPlayerName">Neved:</label>
+          <input type="text" id="loginPlayerName" placeholder="Add meg a neved" maxlength="20" autofocus>
+        </div>
+        <button id="loginBtn" class="btn btn-primary">Bejelentkezés</button>
+      </div>
+    </div>
+
+    <!-- Lobby -->
+    <div id="lobby" class="lobby" style="display: none;">
       <div class="lobby-container">
         <div class="card">
           <h2>Új szoba létrehozása</h2>
-          <div class="form-group">
-            <label for="playerName">Neved:</label>
-            <input type="text" id="playerName" placeholder="Add meg a neved" maxlength="20">
-          </div>
           <div class="form-group">
             <label for="roomId">Szoba azonosító:</label>
             <input type="text" id="roomId" placeholder="Szoba kód (pl: room1)" maxlength="20">
@@ -63,8 +73,8 @@
               <option value="19">19x19 (Nagy)</option>
             </select>
           </div>
-          <button id="joinBtn" class="btn btn-primary">Szoba létrehozása / Csatlakozás</button>
-          <p class="hint">Adj meg egy új szoba kódot vagy csatlakozz lent egy meglévő szobához!</p>
+          <button id="createRoomBtn" class="btn btn-primary">Szoba létrehozása</button>
+          <p class="hint">A szoba létrehozása után csatlakozz hozzá a várakozó szobák listájából!</p>
         </div>
 
         <div class="card rooms-list-card">

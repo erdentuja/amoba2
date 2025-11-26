@@ -8,7 +8,8 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_CODE = process.env.ADMIN_CODE || 'admin123'; // Change this in production!
 
 // Track connected clients
-const connectedClients = new Map(); // socketId -> {name, isAdmin, connectedAt}
+const connectedClients = new Map(); // socketId -> {name, isAdmin, connectedAt, createdRoom}
+const loggedInPlayers = new Map(); // socketId -> {name, loggedInAt}
 
 // Serve static files
 app.use(express.static('public'));
@@ -21,9 +22,11 @@ app.get('/', (req, res) => {
 const rooms = new Map();
 
 class GameRoom {
-  constructor(roomId, boardSize = 15) {
+  constructor(roomId, boardSize = 15, creatorId = null, creatorName = null) {
     this.roomId = roomId;
     this.boardSize = boardSize;
+    this.creatorId = creatorId;
+    this.creatorName = creatorName;
     this.players = [];
     this.board = Array(boardSize).fill(null).map(() => Array(boardSize).fill(null));
     this.currentPlayer = 0; // 0 or 1
@@ -147,7 +150,8 @@ function getRoomsList() {
       playerCount: room.players.length,
       boardSize: room.boardSize,
       players: room.players.map(p => p.name),
-      isWaiting: room.players.length === 1,
+      creatorName: room.creatorName,
+      isWaiting: room.players.length < 2,
       isFull: room.players.length === 2,
       gameStarted: room.players.length === 2
     });
@@ -189,15 +193,68 @@ function broadcastOnlinePlayers() {
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // Add to connected clients (as guest initially)
-  connectedClients.set(socket.id, {
-    name: 'Guest',
-    isAdmin: false,
-    connectedAt: new Date()
-  });
-
   // Send current rooms list to newly connected client
   socket.emit('roomsList', getRoomsList());
+
+  // Player login (just registers the player)
+  socket.on('login', ({ playerName }) => {
+    const name = playerName || `Player_${socket.id.substring(0, 4)}`;
+
+    // Add to connected clients
+    connectedClients.set(socket.id, {
+      name: name,
+      isAdmin: false,
+      connectedAt: new Date(),
+      createdRoom: null
+    });
+
+    // Add to logged in players
+    loggedInPlayers.set(socket.id, {
+      name: name,
+      loggedInAt: new Date()
+    });
+
+    socket.emit('loginSuccess', { playerName: name });
+    console.log('Player logged in:', name, socket.id);
+
+    // Broadcast updated players list to admins
+    broadcastOnlinePlayers();
+  });
+
+  // Create room (without joining)
+  socket.on('createRoom', ({ roomId, boardSize }) => {
+    const client = connectedClients.get(socket.id);
+
+    if (!client) {
+      socket.emit('error', 'Kérlek először jelentkezz be!');
+      return;
+    }
+
+    // Check if player already created a room
+    if (client.createdRoom) {
+      socket.emit('error', 'Már hoztál létre egy szobát! Csak egy szobát hozhatsz létre egyszerre.');
+      return;
+    }
+
+    // Check if room already exists
+    if (rooms.has(roomId)) {
+      socket.emit('error', 'Ez a szoba már létezik!');
+      return;
+    }
+
+    const size = boardSize || 15;
+    const newRoom = new GameRoom(roomId, size, socket.id, client.name);
+    rooms.set(roomId, newRoom);
+
+    // Track that this player created this room
+    client.createdRoom = roomId;
+
+    socket.emit('roomCreated', { roomId, boardSize: size });
+    console.log(`Room ${roomId} created by ${client.name}`);
+
+    // Broadcast updated rooms list
+    broadcastRoomsList();
+  });
 
   // Admin login
   socket.on('adminLogin', ({ adminCode }) => {
@@ -215,38 +272,43 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('joinRoom', ({ roomId, playerName, boardSize }) => {
+  socket.on('joinRoom', ({ roomId }) => {
+    const client = connectedClients.get(socket.id);
+
+    if (!client) {
+      socket.emit('error', 'Kérlek először jelentkezz be!');
+      return;
+    }
+
     if (!rooms.has(roomId)) {
-      const size = boardSize || 15;
-      rooms.set(roomId, new GameRoom(roomId, size));
+      socket.emit('error', 'Ez a szoba nem létezik!');
+      return;
     }
 
     const room = rooms.get(roomId);
-    const joined = room.addPlayer(socket.id, playerName || `Player ${room.players.length + 1}`);
+    const joined = room.addPlayer(socket.id, client.name);
 
     if (joined) {
       socket.join(roomId);
       socket.roomId = roomId;
 
       // Update connected client info
-      const client = connectedClients.get(socket.id);
-      if (client) {
-        client.name = playerName;
-        client.room = roomId;
-      }
+      client.room = roomId;
 
       io.to(roomId).emit('gameState', room.getState());
-      io.to(roomId).emit('message', `${playerName || 'Player'} joined the game`);
+      io.to(roomId).emit('message', `${client.name} csatlakozott a játékhoz`);
 
       if (room.players.length === 2) {
-        io.to(roomId).emit('message', 'Game started! X goes first.');
+        io.to(roomId).emit('message', 'Játék elindult! X kezd.');
       }
 
       // Broadcast updated rooms list
       broadcastRoomsList();
       broadcastOnlinePlayers();
+
+      console.log(`${client.name} joined room ${roomId}`);
     } else {
-      socket.emit('error', 'Room is full');
+      socket.emit('error', 'A szoba tele van!');
     }
   });
 
@@ -329,8 +391,20 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
 
-    // Remove from connected clients
+    const client = connectedClients.get(socket.id);
+
+    // Remove from connected clients and logged in players
     connectedClients.delete(socket.id);
+    loggedInPlayers.delete(socket.id);
+
+    // If player created a room, delete it if empty
+    if (client && client.createdRoom) {
+      const createdRoom = rooms.get(client.createdRoom);
+      if (createdRoom && createdRoom.players.length === 0) {
+        rooms.delete(client.createdRoom);
+        console.log(`Deleted empty room ${client.createdRoom} created by ${client.name}`);
+      }
+    }
 
     if (socket.roomId) {
       const room = rooms.get(socket.roomId);
@@ -341,7 +415,7 @@ io.on('connection', (socket) => {
         if (room.players.length === 0) {
           rooms.delete(socket.roomId);
         } else {
-          io.to(socket.roomId).emit('message', `${player?.name || 'Player'} left the game`);
+          io.to(socket.roomId).emit('message', `${player?.name || 'Játékos'} kilépett a játékból`);
           io.to(socket.roomId).emit('gameState', room.getState());
         }
 
@@ -350,8 +424,9 @@ io.on('connection', (socket) => {
       }
     }
 
-    // Broadcast updated online players list to admins
+    // Broadcast updated online players list to admins and rooms list
     broadcastOnlinePlayers();
+    broadcastRoomsList();
   });
 });
 
