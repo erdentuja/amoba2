@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amőba Online</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎮 Amőba Online</h1>
+      <p class="subtitle">5-öt egy sorba - Gomoku</p>
+    </header>
+
+    <div id="lobby" class="lobby">
+      <div class="card">
+        <h2>Csatlakozás játékhoz</h2>
+        <div class="form-group">
+          <label for="playerName">Neved:</label>
+          <input type="text" id="playerName" placeholder="Add meg a neved" maxlength="20">
+        </div>
+        <div class="form-group">
+          <label for="roomId">Szoba azonosító:</label>
+          <input type="text" id="roomId" placeholder="Szoba kód (pl: room1)" maxlength="20">
+        </div>
+        <button id="joinBtn" class="btn btn-primary">Csatlakozás</button>
+        <p class="hint">Tipp: Oszd meg a szoba kódot egy baráttal, hogy együtt játszhassatok!</p>
+      </div>
+    </div>
+
+    <div id="gameArea" class="game-area" style="display: none;">
+      <div class="game-info">
+        <div class="players-info">
+          <div id="player1Info" class="player-info">
+            <span class="player-symbol">X</span>
+            <span class="player-name">Várakozás...</span>
+          </div>
+          <div id="player2Info" class="player-info">
+            <span class="player-symbol">O</span>
+            <span class="player-name">Várakozás...</span>
+          </div>
+        </div>
+        <div id="currentTurn" class="current-turn">Várakozás másik játékosra...</div>
+        <div id="messages" class="messages"></div>
+      </div>
+
+      <div class="board-container">
+        <canvas id="gameBoard" width="750" height="750"></canvas>
+      </div>
+
+      <div class="game-controls">
+        <button id="resetBtn" class="btn btn-secondary">Új játék</button>
+        <button id="leaveBtn" class="btn btn-danger">Kilépés</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
