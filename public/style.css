@@ -188,6 +188,11 @@ header h1 {
   color: white;
 }
 
+.btn-warning {
+  background: #ff9800;
+  color: white;
+}
+
 .hint {
   margin-top: 20px;
   font-size: 14px;
@@ -197,6 +202,8 @@ header h1 {
 }
 
 .game-area {
+  display: flex;
+  flex-direction: column;
   background: white;
   padding: 20px;
   border-radius: 15px;
@@ -207,6 +214,19 @@ header h1 {
 
 .game-info {
   margin-bottom: 20px;
+}
+
+.room-id-display {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #667eea;
+  padding: 10px;
+  margin-bottom: 15px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
 }
 
 .players-info {
@@ -392,6 +412,11 @@ header h1 {
 
 .room-status.waiting {
   background: #4CAF50;
+  color: white;
+}
+
+.room-status.in-progress {
+  background: #2196F3;
   color: white;
 }
 
@@ -792,6 +817,13 @@ header h1 {
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
+.victory-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .victory-btn {
   font-size: 20px;
   padding: 15px 40px;
@@ -807,6 +839,18 @@ header h1 {
 .victory-btn:hover {
   transform: scale(1.1);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+}
+
+.victory-btn.btn-danger {
+  background: #f44336;
+  color: white;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 20px;
 }
 
 /* Confetti Animation */

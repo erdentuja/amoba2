@@ -32,7 +32,22 @@
         <h1 class="victory-title">Gratulálok!</h1>
         <p class="victory-winner" id="victoryWinnerName"></p>
         <p class="victory-message">Győzött a játékban!</p>
-        <button id="victoryCloseBtn" class="btn btn-primary victory-btn">Bezárás</button>
+        <div class="victory-buttons">
+          <button id="victoryNewGameBtn" class="btn btn-primary victory-btn">🔄 Új játék</button>
+          <button id="victoryLeaveBtn" class="btn btn-danger victory-btn">🚪 Kilépés</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Game Request Modal -->
+    <div id="newGameRequestModal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <h2>🎮 Új játék kérés</h2>
+        <p id="newGameRequestMessage">Az ellenfeled új játékot szeretne kezdeni.</p>
+        <div class="modal-buttons">
+          <button id="acceptNewGameBtn" class="btn btn-primary">✅ Elfogadom</button>
+          <button id="declineNewGameBtn" class="btn btn-danger">❌ Elutasítom</button>
+        </div>
       </div>
     </div>
 
@@ -105,10 +120,7 @@
 
         <div class="card">
           <h2>Új szoba létrehozása</h2>
-          <div class="form-group">
-            <label for="roomId">Szoba azonosító:</label>
-            <input type="text" id="roomId" placeholder="Szoba kód (pl: room1)" maxlength="20">
-          </div>
+          <p class="hint">🎲 A szoba kódot automatikusan generáljuk</p>
           <div class="form-group">
             <label for="boardSize">Tábla méret:</label>
             <select id="boardSize" class="board-size-select">
@@ -118,14 +130,23 @@
               <option value="19">19x19 (Nagy)</option>
             </select>
           </div>
+          <div class="form-group">
+            <label for="gameMode">Játék mód:</label>
+            <select id="gameMode" class="board-size-select">
+              <option value="pvp">👥 Játékos vs Játékos</option>
+              <option value="ai-easy">🤖 AI (Könnyű)</option>
+              <option value="ai-medium">🤖 AI (Közepes)</option>
+              <option value="ai-hard">🤖 AI (Nehéz)</option>
+            </select>
+          </div>
           <button id="createRoomBtn" class="btn btn-primary">Szoba létrehozása</button>
-          <p class="hint">A szoba létrehozása után csatlakozz hozzá a várakozó szobák listájából!</p>
+          <p class="hint">💡 AI módban automatikusan kezdheted a játékot!</p>
         </div>
 
         <div class="card rooms-list-card">
-          <h2>Várakozó szobák</h2>
+          <h2>Szobák</h2>
           <div id="roomsList" class="rooms-list">
-            <p class="no-rooms">Jelenleg nincsenek várakozó szobák...</p>
+            <p class="no-rooms">Jelenleg nincsenek szobák...</p>
           </div>
         </div>
       </div>
@@ -133,6 +154,7 @@
 
     <div id="gameArea" class="game-area" style="display: none;">
       <div class="game-info">
+        <div id="roomIdDisplay" class="room-id-display" style="display: none;"></div>
         <div class="players-info">
           <div id="player1Info" class="player-info">
             <span class="player-symbol">X</span>
@@ -159,6 +181,7 @@
         <button id="undoBtn" class="btn btn-secondary" disabled>↶ Visszavonás</button>
         <button id="resetBtn" class="btn btn-secondary">Új játék</button>
         <button id="soundToggle" class="btn btn-secondary" onclick="toggleSound()">🔊 Hang BE</button>
+        <button id="leaveSpectatorBtn" class="btn btn-warning" style="display: none;">👁️ Kilépés a nézői módból</button>
         <button id="leaveBtn" class="btn btn-danger">Kilépés</button>
       </div>
     </div>

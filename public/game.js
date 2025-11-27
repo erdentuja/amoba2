@@ -9,13 +9,13 @@ const loginPlayerNameInput = document.getElementById('loginPlayerName');
 const loginBtn = document.getElementById('loginBtn');
 const lobby = document.getElementById('lobby');
 const gameArea = document.getElementById('gameArea');
-const roomIdInput = document.getElementById('roomId');
 const boardSizeInput = document.getElementById('boardSize');
 const createRoomBtn = document.getElementById('createRoomBtn');
 const roomsListDiv = document.getElementById('roomsList');
 const undoBtn = document.getElementById('undoBtn');
 const resetBtn = document.getElementById('resetBtn');
 const leaveBtn = document.getElementById('leaveBtn');
+const leaveSpectatorBtn = document.getElementById('leaveSpectatorBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const welcomePlayerName = document.getElementById('welcomePlayerName');
 const lobbyOnlinePlayersList = document.getElementById('lobbyOnlinePlayersList');
@@ -28,14 +28,22 @@ const player1Info = document.getElementById('player1Info');
 const player2Info = document.getElementById('player2Info');
 const timerDiv = document.getElementById('timer');
 const timerDisplay = document.getElementById('timerDisplay');
+const roomIdDisplay = document.getElementById('roomIdDisplay');
+const victoryNewGameBtn = document.getElementById('victoryNewGameBtn');
+const victoryLeaveBtn = document.getElementById('victoryLeaveBtn');
+const newGameRequestModal = document.getElementById('newGameRequestModal');
+const acceptNewGameBtn = document.getElementById('acceptNewGameBtn');
+const declineNewGameBtn = document.getElementById('declineNewGameBtn');
 
 // Game state
 let socket = null;
 let gameState = null;
 let myPlayerId = null;
 let myPlayerName = null;
+let currentRoomId = null;
 let isLoggedIn = false;
 let isAdmin = false;
+let isSpectator = false;
 let timerInterval = null;
 let winningAnimationFrame = 0;
 let animationInterval = null;
@@ -202,6 +210,127 @@ function initSocketConnection() {
       alert(error);
     });
 
+    // Handle game state updates (for both players and spectators)
+    socket.on('gameState', (state) => {
+      const wasGameOver = gameState && gameState.gameOver;
+      const playersChanged = !gameState || gameState.players.length !== state.players.length;
+
+      gameState = state;
+
+      // Update board size from server
+      if (state.boardSize) {
+        BOARD_SIZE = state.boardSize;
+        CANVAS_SIZE = BOARD_SIZE * CELL_SIZE;
+        canvas.width = CANVAS_SIZE;
+        canvas.height = CANVAS_SIZE;
+      }
+
+      // Play sounds (only if not spectator or game just ended)
+      if (!isSpectator) {
+        if (state.gameOver && !wasGameOver) {
+          sounds.win();
+        } else if (playersChanged && state.players.length === 2) {
+          sounds.gameStart();
+        } else if (state.board && !wasGameOver) {
+          sounds.click();
+        }
+      }
+
+      updateGameDisplay();
+    });
+
+    // Handle messages
+    socket.on('message', (msg) => {
+      showMessage(msg);
+    });
+
+    // Handle spectator joined
+    socket.on('spectatorJoined', ({ roomId }) => {
+      isSpectator = true;
+      currentRoomId = roomId;
+      lobby.style.display = 'none';
+      gameArea.style.display = 'flex';
+
+      // Show room ID for spectators
+      if (roomIdDisplay) {
+        roomIdDisplay.textContent = `📺 Szoba: ${roomId}`;
+        roomIdDisplay.style.display = 'block';
+      }
+
+      // Show leave spectator button, hide game controls for spectators
+      leaveSpectatorBtn.style.display = 'inline-block';
+      undoBtn.style.display = 'none';
+      resetBtn.style.display = 'none';
+      leaveBtn.style.display = 'none';
+
+      showMessage(`🎬 Nézői mód aktív`);
+    });
+
+    // Handle left spectator mode
+    socket.on('leftSpectator', () => {
+      isSpectator = false;
+      currentRoomId = null;
+      gameArea.style.display = 'none';
+      lobby.style.display = 'flex';
+
+      // Hide room ID display
+      if (roomIdDisplay) {
+        roomIdDisplay.style.display = 'none';
+      }
+
+      // Reset button visibility
+      leaveSpectatorBtn.style.display = 'none';
+      undoBtn.style.display = 'inline-block';
+      resetBtn.style.display = 'inline-block';
+      leaveBtn.style.display = 'inline-block';
+
+      gameState = null;
+      stopTimer();
+    });
+
+    // Handle room closed
+    socket.on('roomClosed', ({ message }) => {
+      alert(message || 'A szoba bezárva');
+      isSpectator = false;
+      currentRoomId = null;
+      gameArea.style.display = 'none';
+      lobby.style.display = 'flex';
+
+      // Hide room ID display
+      if (roomIdDisplay) {
+        roomIdDisplay.style.display = 'none';
+      }
+
+      // Reset button visibility
+      leaveSpectatorBtn.style.display = 'none';
+      undoBtn.style.display = 'inline-block';
+      resetBtn.style.display = 'inline-block';
+      leaveBtn.style.display = 'inline-block';
+
+      gameState = null;
+      stopTimer();
+    });
+
+    // Handle new game request
+    socket.on('newGameRequest', ({ requesterName }) => {
+      const message = document.getElementById('newGameRequestMessage');
+      if (message) {
+        message.textContent = `${requesterName} új játékot szeretne kezdeni.`;
+      }
+      newGameRequestModal.style.display = 'flex';
+    });
+
+    // Handle new game accepted
+    socket.on('newGameAccepted', () => {
+      closeVictoryModal();
+      showMessage('🎮 Az ellenfél elfogadta! Új játék indul...');
+    });
+
+    // Handle new game declined
+    socket.on('newGameDeclined', () => {
+      showMessage('❌ Az ellenfél elutasította az új játék kérést');
+    });
+
     setupAdminListeners();
   }
 }
@@ -215,16 +344,22 @@ function setupEventListeners() {
 
   // Room creation
   createRoomBtn.addEventListener('click', handleCreateRoom);
-  roomIdInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') handleCreateRoom();
-  });
 
   // Game controls
   undoBtn.addEventListener('click', undoMove);
   resetBtn.addEventListener('click', resetGame);
   leaveBtn.addEventListener('click', leaveGame);
+  leaveSpectatorBtn.addEventListener('click', handleLeaveSpectator);
   logoutBtn.addEventListener('click', handleLogout);
   canvas.addEventListener('click', handleCanvasClick);
+
+  // Victory modal controls
+  if (victoryNewGameBtn) victoryNewGameBtn.addEventListener('click', requestNewGame);
+  if (victoryLeaveBtn) victoryLeaveBtn.addEventListener('click', leaveGameFromVictory);
+
+  // New game request modal
+  if (acceptNewGameBtn) acceptNewGameBtn.addEventListener('click', acceptNewGame);
+  if (declineNewGameBtn) declineNewGameBtn.addEventListener('click', declineNewGame);
 }
 
 // Handle login
@@ -243,43 +378,40 @@ function handleLogin() {
 
 // Handle create room
 function handleCreateRoom() {
-  const roomId = roomIdInput.value.trim();
   const boardSize = parseInt(boardSizeInput.value);
-
-  if (!roomId) {
-    alert('Kérlek add meg a szoba azonosítót!');
-    return;
-  }
+  const gameMode = document.getElementById('gameMode').value;
 
   if (!isLoggedIn) {
     alert('Kérlek először jelentkezz be!');
     return;
   }
 
-  socket.emit('createRoom', { roomId, boardSize });
-  roomIdInput.value = '';
+  socket.emit('createRoom', { boardSize, gameMode });
 }
 
 // Update rooms list
 function updateRoomsList(rooms) {
-  const waitingRooms = rooms.filter(room => room.isWaiting);
-
-  if (waitingRooms.length === 0) {
-    roomsListDiv.innerHTML = '<p class="no-rooms">Jelenleg nincsenek várakozó szobák...</p>';
+  if (rooms.length === 0) {
+    roomsListDiv.innerHTML = '<p class="no-rooms">Jelenleg nincsenek szobák...</p>';
     return;
   }
 
   roomsListDiv.innerHTML = '';
-  waitingRooms.forEach(room => {
+  rooms.forEach(room => {
     const roomDiv = document.createElement('div');
     roomDiv.className = 'room-item';
 
     const playersList = room.players.length > 0 ? room.players.join(', ') : `${room.creatorName} (Létrehozó)`;
+    const statusClass = room.status === 'waiting' ? 'waiting' : 'in-progress';
+    const statusText = room.status === 'waiting' ? 'Várakozik' : 'Játék folyamatban';
+    const actionButton = room.status === 'waiting'
+      ? `<button class="btn btn-primary" onclick="joinExistingRoom('${room.roomId}')">Csatlakozás</button>`
+      : `<button class="btn btn-secondary" onclick="watchGame('${room.roomId}')">👁️ Megnézem (${room.spectatorCount || 0} néző)</button>`;
 
     roomDiv.innerHTML = `
       <div class="room-header">
         <span class="room-id">🎮 ${room.roomId}</span>
-        <span class="room-status waiting">Várakozik</span>
+        <span class="room-status ${statusClass}">${statusText}</span>
       </div>
       <div class="room-info">
         <span>👥 ${room.playerCount}/2 játékos</span>
@@ -288,7 +420,7 @@ function updateRoomsList(rooms) {
       <div class="room-players">
         ${room.playerCount > 0 ? 'Játékosok: ' + playersList : 'Létrehozó: ' + room.creatorName}
       </div>
-      <button class="btn btn-primary" onclick="joinExistingRoom('${room.roomId}')">Csatlakozás</button>
+      ${actionButton}
     `;
     roomsListDiv.appendChild(roomDiv);
   });
@@ -341,6 +473,23 @@ function handleLogout() {
   }
 }
 
+// Watch a game as spectator
+function watchGame(roomId) {
+  if (!isLoggedIn) {
+    alert('Kérlek először jelentkezz be!');
+    return;
+  }
+
+  socket.emit('watchRoom', { roomId });
+}
+
+// Handle leave spectator mode
+function handleLeaveSpectator() {
+  if (confirm('Kilépés a nézői módból?')) {
+    socket.emit('leaveSpectator');
+  }
+}
+
 // Join existing room
 function joinExistingRoom(roomId) {
   if (!isLoggedIn) {
@@ -350,55 +499,22 @@ function joinExistingRoom(roomId) {
 
   socket.emit('joinRoom', { roomId });
 
-  // Setup game state listener
-  socket.on('gameState', (state) => {
-    const wasGameOver = gameState && gameState.gameOver;
-    const playersChanged = !gameState || gameState.players.length !== state.players.length;
-
-    gameState = state;
-
-    // Update board size from server
-    if (state.boardSize) {
-      BOARD_SIZE = state.boardSize;
-      CANVAS_SIZE = BOARD_SIZE * CELL_SIZE;
-      canvas.width = CANVAS_SIZE;
-      canvas.height = CANVAS_SIZE;
-    }
-
-    // Play sounds
-    if (state.gameOver && !wasGameOver) {
-      // Game just ended
-      sounds.win();
-    } else if (playersChanged && state.players.length === 2) {
-      // Game started (2 players joined)
-      sounds.gameStart();
-    } else if (state.board && !wasGameOver) {
-      // Regular move
-      sounds.click();
-    }
-
-    updateGameDisplay();
-  });
-
-  socket.on('message', (msg) => {
-    showMessage(msg);
-  });
-
   // Show game area
   lobby.style.display = 'none';
   gameArea.style.display = 'block';
 }
 
 function leaveGame() {
-  // Leave the room but stay connected
+  // Notify server that player is leaving
   if (socket && socket.roomId) {
-    socket.roomId = null;
+    socket.emit('leaveRoom');
   }
 
   stopTimer();
   gameArea.style.display = 'none';
   lobby.style.display = 'flex';
   gameState = null;
+  socket.roomId = null;
 }
 
 function undoMove() {
@@ -499,8 +615,10 @@ function updateGameDisplay() {
       // Start winning animation
       startWinningAnimation();
 
-      // Show victory modal
-      showVictoryModal(gameState.winner);
+      // Show victory modal (only for players, not spectators)
+      if (!isSpectator) {
+        showVictoryModal(gameState.winner);
+      }
     } else {
       currentTurnDiv.textContent = '🤝 Döntetlen!';
       currentTurnDiv.style.color = '#FF9800';
@@ -510,11 +628,18 @@ function updateGameDisplay() {
     stopWinningAnimation();
 
     if (gameState.players.length < 2) {
-      currentTurnDiv.textContent = 'Várakozás másik játékosra...';
-      currentTurnDiv.style.color = '#999';
+      // Don't show waiting message in spectator mode
+      if (!isSpectator) {
+        currentTurnDiv.textContent = 'Várakozás másik játékosra...';
+        currentTurnDiv.style.color = '#999';
+      } else {
+        currentTurnDiv.textContent = 'Játék hamarosan kezdődik...';
+        currentTurnDiv.style.color = '#999';
+      }
     } else {
       const currentPlayer = gameState.players[gameState.currentPlayer];
-      currentTurnDiv.textContent = `${currentPlayer.name} következik (${currentPlayer.symbol})`;
+      const prefix = isSpectator ? '👁️ ' : '';
+      currentTurnDiv.textContent = `${prefix}${currentPlayer.name} következik (${currentPlayer.symbol})`;
       currentTurnDiv.style.color = '#667eea';
     }
   }
@@ -608,14 +733,19 @@ function drawBoard() {
           // Check if this piece is a winning piece
           const isWinningPiece = gameState.winningPieces &&
             gameState.winningPieces.some(([r, c]) => r === row && c === col);
-          drawPiece(row, col, cell, isWinningPiece);
+
+          // Check if this is the last move
+          const isLastMove = gameState.lastMove &&
+            gameState.lastMove.row === row && gameState.lastMove.col === col;
+
+          drawPiece(row, col, cell, isWinningPiece, isLastMove);
         }
       }
     }
   }
 }
 
-function drawPiece(row, col, symbol, isWinningPiece = false) {
+function drawPiece(row, col, symbol, isWinningPiece = false, isLastMove = false) {
   const x = col * CELL_SIZE + CELL_SIZE / 2;
   const y = row * CELL_SIZE + CELL_SIZE / 2;
   let radius = CELL_SIZE / 2 - 5;
@@ -675,6 +805,19 @@ function drawPiece(row, col, symbol, isWinningPiece = false) {
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.shadowBlur = 0;
+  }
+
+  // Draw last move indicator (small red dot)
+  if (isLastMove && !isWinningPiece) {
+    ctx.fillStyle = '#FF4444';
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Add white border for visibility
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 }
 
@@ -863,7 +1006,6 @@ function closeRoom(roomId) {
 function showVictoryModal(winner) {
   const victoryModal = document.getElementById('victoryModal');
   const victoryWinnerName = document.getElementById('victoryWinnerName');
-  const victoryCloseBtn = document.getElementById('victoryCloseBtn');
 
   if (!victoryModal || !victoryWinnerName) return;
 
@@ -872,20 +1014,40 @@ function showVictoryModal(winner) {
 
   // Create confetti effect
   createConfetti();
+}
 
-  // Close button handler
-  victoryCloseBtn.onclick = () => {
+function closeVictoryModal() {
+  const victoryModal = document.getElementById('victoryModal');
+  if (victoryModal) {
     victoryModal.style.display = 'none';
     clearConfetti();
-  };
+  }
+}
 
-  // Close on click outside
-  victoryModal.onclick = (e) => {
-    if (e.target === victoryModal) {
-      victoryModal.style.display = 'none';
-      clearConfetti();
-    }
-  };
+// Request new game
+function requestNewGame() {
+  closeVictoryModal();
+  socket.emit('requestNewGame');
+  showMessage('Új játék kérés elküldve...');
+}
+
+// Leave game from victory modal
+function leaveGameFromVictory() {
+  closeVictoryModal();
+  leaveGame();
+}
+
+// Accept new game request
+function acceptNewGame() {
+  newGameRequestModal.style.display = 'none';
+  socket.emit('acceptNewGame');
+}
+
+// Decline new game request
+function declineNewGame() {
+  newGameRequestModal.style.display = 'none';
+  socket.emit('declineNewGame');
+  showMessage('Új játék kérés elutasítva');
 }
 
 // Confetti effect
