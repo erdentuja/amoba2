@@ -805,6 +805,57 @@ io.on('connection', (socket) => {
     broadcastRoomsList();
   });
 
+  // Leave room (player leaving game)
+  socket.on('leaveRoom', () => {
+    if (!socket.roomId) return;
+
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+
+    const client = connectedClients.get(socket.id);
+    const player = room.players.find(p => p.id === socket.id);
+
+    if (player) {
+      // If a player leaves, delete the entire room and kick everyone
+      io.to(socket.roomId).emit('message', `${player.name} kilépett - Szoba bezárva`);
+      io.to(socket.roomId).emit('roomClosed', { message: 'Játékos kilépett, szoba bezárva' });
+
+      // Clear all players and spectators
+      room.players.forEach(p => {
+        if (p.id !== socket.id) {
+          const playerSocket = io.sockets.sockets.get(p.id);
+          if (playerSocket) {
+            playerSocket.leave(socket.roomId);
+            playerSocket.roomId = null;
+          }
+        }
+      });
+
+      room.spectators.forEach(spectator => {
+        const spectatorSocket = io.sockets.sockets.get(spectator.id);
+        if (spectatorSocket) {
+          spectatorSocket.leave(socket.roomId);
+          spectatorSocket.roomId = null;
+          spectatorSocket.isSpectator = false;
+        }
+      });
+
+      rooms.delete(socket.roomId);
+      console.log(`Room ${socket.roomId} deleted because ${player.name} left`);
+    }
+
+    socket.leave(socket.roomId);
+    if (client) {
+      client.room = null;
+    }
+    socket.roomId = null;
+
+    // Broadcast updated rooms list
+    broadcastRoomsList();
+    broadcastOnlinePlayers();
+    broadcastLobbyPlayers();
+  });
+
   socket.on('makeMove', ({ row, col }) => {
     if (!socket.roomId) return;
 

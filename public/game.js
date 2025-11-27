@@ -505,15 +505,16 @@ function joinExistingRoom(roomId) {
 }
 
 function leaveGame() {
-  // Leave the room but stay connected
+  // Notify server that player is leaving
   if (socket && socket.roomId) {
-    socket.roomId = null;
+    socket.emit('leaveRoom');
   }
 
   stopTimer();
   gameArea.style.display = 'none';
   lobby.style.display = 'flex';
   gameState = null;
+  socket.roomId = null;
 }
 
 function undoMove() {
