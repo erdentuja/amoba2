@@ -29,6 +29,11 @@ const player2Info = document.getElementById('player2Info');
 const timerDiv = document.getElementById('timer');
 const timerDisplay = document.getElementById('timerDisplay');
 const roomIdDisplay = document.getElementById('roomIdDisplay');
+const victoryNewGameBtn = document.getElementById('victoryNewGameBtn');
+const victoryLeaveBtn = document.getElementById('victoryLeaveBtn');
+const newGameRequestModal = document.getElementById('newGameRequestModal');
+const acceptNewGameBtn = document.getElementById('acceptNewGameBtn');
+const declineNewGameBtn = document.getElementById('declineNewGameBtn');
 
 // Game state
 let socket = null;
@@ -306,6 +311,26 @@ function initSocketConnection() {
       stopTimer();
     });
 
+    // Handle new game request
+    socket.on('newGameRequest', ({ requesterName }) => {
+      const message = document.getElementById('newGameRequestMessage');
+      if (message) {
+        message.textContent = `${requesterName} új játékot szeretne kezdeni.`;
+      }
+      newGameRequestModal.style.display = 'flex';
+    });
+
+    // Handle new game accepted
+    socket.on('newGameAccepted', () => {
+      closeVictoryModal();
+      showMessage('🎮 Az ellenfél elfogadta! Új játék indul...');
+    });
+
+    // Handle new game declined
+    socket.on('newGameDeclined', () => {
+      showMessage('❌ Az ellenfél elutasította az új játék kérést');
+    });
+
     setupAdminListeners();
   }
 }
@@ -327,6 +352,14 @@ function setupEventListeners() {
   leaveSpectatorBtn.addEventListener('click', handleLeaveSpectator);
   logoutBtn.addEventListener('click', handleLogout);
   canvas.addEventListener('click', handleCanvasClick);
+
+  // Victory modal controls
+  if (victoryNewGameBtn) victoryNewGameBtn.addEventListener('click', requestNewGame);
+  if (victoryLeaveBtn) victoryLeaveBtn.addEventListener('click', leaveGameFromVictory);
+
+  // New game request modal
+  if (acceptNewGameBtn) acceptNewGameBtn.addEventListener('click', acceptNewGame);
+  if (declineNewGameBtn) declineNewGameBtn.addEventListener('click', declineNewGame);
 }
 
 // Handle login
@@ -972,7 +1005,6 @@ function closeRoom(roomId) {
 function showVictoryModal(winner) {
   const victoryModal = document.getElementById('victoryModal');
   const victoryWinnerName = document.getElementById('victoryWinnerName');
-  const victoryCloseBtn = document.getElementById('victoryCloseBtn');
 
   if (!victoryModal || !victoryWinnerName) return;
 
@@ -981,20 +1013,40 @@ function showVictoryModal(winner) {
 
   // Create confetti effect
   createConfetti();
+}
 
-  // Close button handler
-  victoryCloseBtn.onclick = () => {
+function closeVictoryModal() {
+  const victoryModal = document.getElementById('victoryModal');
+  if (victoryModal) {
     victoryModal.style.display = 'none';
     clearConfetti();
-  };
+  }
+}
 
-  // Close on click outside
-  victoryModal.onclick = (e) => {
-    if (e.target === victoryModal) {
-      victoryModal.style.display = 'none';
-      clearConfetti();
-    }
-  };
+// Request new game
+function requestNewGame() {
+  closeVictoryModal();
+  socket.emit('requestNewGame');
+  showMessage('Új játék kérés elküldve...');
+}
+
+// Leave game from victory modal
+function leaveGameFromVictory() {
+  closeVictoryModal();
+  leaveGame();
+}
+
+// Accept new game request
+function acceptNewGame() {
+  newGameRequestModal.style.display = 'none';
+  socket.emit('acceptNewGame');
+}
+
+// Decline new game request
+function declineNewGame() {
+  newGameRequestModal.style.display = 'none';
+  socket.emit('declineNewGame');
+  showMessage('Új játék kérés elutasítva');
 }
 
 // Confetti effect

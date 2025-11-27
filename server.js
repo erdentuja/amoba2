@@ -892,6 +892,59 @@ io.on('connection', (socket) => {
     io.to(socket.roomId).emit('message', 'Game reset! X goes first.');
   });
 
+  // Request new game
+  socket.on('requestNewGame', () => {
+    if (!socket.roomId) return;
+
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+
+    const client = connectedClients.get(socket.id);
+    if (!client) return;
+
+    // Find the opponent (not spectators, only players)
+    const opponent = room.players.find(p => p.id !== socket.id && !p.isAI);
+    if (opponent) {
+      io.to(opponent.id).emit('newGameRequest', { requesterName: client.name });
+    }
+  });
+
+  // Accept new game
+  socket.on('acceptNewGame', () => {
+    if (!socket.roomId) return;
+
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+
+    // Reset the game
+    room.reset();
+
+    // Notify both players
+    io.to(socket.roomId).emit('newGameAccepted');
+    io.to(socket.roomId).emit('gameState', room.getState());
+    io.to(socket.roomId).emit('message', '🎮 Új játék kezdődik! X kezd.');
+
+    // Start timer if enabled
+    room.startTimer(() => {
+      io.to(socket.roomId).emit('message', 'Idő lejárt! Kör átugrva.');
+      io.to(socket.roomId).emit('gameState', room.getState());
+    });
+  });
+
+  // Decline new game
+  socket.on('declineNewGame', () => {
+    if (!socket.roomId) return;
+
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+
+    // Find the requester (opponent)
+    const opponent = room.players.find(p => p.id !== socket.id && !p.isAI);
+    if (opponent) {
+      io.to(opponent.id).emit('newGameDeclined');
+    }
+  });
+
   // Admin: Kick player
   socket.on('adminKickPlayer', ({ targetSocketId }) => {
     const client = connectedClients.get(socket.id);

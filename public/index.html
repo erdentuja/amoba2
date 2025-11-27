@@ -32,7 +32,22 @@
         <h1 class="victory-title">Gratulálok!</h1>
         <p class="victory-winner" id="victoryWinnerName"></p>
         <p class="victory-message">Győzött a játékban!</p>
-        <button id="victoryCloseBtn" class="btn btn-primary victory-btn">Bezárás</button>
+        <div class="victory-buttons">
+          <button id="victoryNewGameBtn" class="btn btn-primary victory-btn">🔄 Új játék</button>
+          <button id="victoryLeaveBtn" class="btn btn-danger victory-btn">🚪 Kilépés</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Game Request Modal -->
+    <div id="newGameRequestModal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <h2>🎮 Új játék kérés</h2>
+        <p id="newGameRequestMessage">Az ellenfeled új játékot szeretne kezdeni.</p>
+        <div class="modal-buttons">
+          <button id="acceptNewGameBtn" class="btn btn-primary">✅ Elfogadom</button>
+          <button id="declineNewGameBtn" class="btn btn-danger">❌ Elutasítom</button>
+        </div>
       </div>
     </div>
 

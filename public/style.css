@@ -202,6 +202,8 @@ header h1 {
 }
 
 .game-area {
+  display: flex;
+  flex-direction: column;
   background: white;
   padding: 20px;
   border-radius: 15px;
@@ -815,6 +817,13 @@ header h1 {
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
+.victory-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .victory-btn {
   font-size: 20px;
   padding: 15px 40px;
@@ -830,6 +839,18 @@ header h1 {
 .victory-btn:hover {
   transform: scale(1.1);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+}
+
+.victory-btn.btn-danger {
+  background: #f44336;
+  color: white;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 20px;
 }
 
 /* Confetti Animation */
