@@ -815,6 +815,14 @@ io.on('connection', (socket) => {
       io.to(roomId).emit('gameState', room.getState());
       io.to(roomId).emit('message', `${client.name} csatlakozott a játékhoz`);
 
+      // Send chat system message
+      io.to(roomId).emit('chatMessage', {
+        senderId: 'system',
+        senderName: 'Rendszer',
+        message: `${client.name} csatlakozott a szobához`,
+        timestamp: Date.now()
+      });
+
       if (room.players.length === 2) {
         io.to(roomId).emit('message', 'Játék elindult! X kezd.');
 
@@ -864,6 +872,14 @@ io.on('connection', (socket) => {
       socket.emit('spectatorJoined', { roomId });
       socket.emit('gameState', room.getState());
       io.to(roomId).emit('message', `${client.name} nézi a játékot`);
+
+      // Send chat system message
+      io.to(roomId).emit('chatMessage', {
+        senderId: 'system',
+        senderName: 'Rendszer',
+        message: `👁️ ${client.name} nézi a játékot`,
+        timestamp: Date.now()
+      });
 
       // Broadcast updated rooms list
       broadcastRoomsList();
@@ -1007,6 +1023,30 @@ io.on('connection', (socket) => {
     } else {
       socket.emit('error', result.error);
     }
+  });
+
+  socket.on('chatMessage', ({ message }) => {
+    if (!socket.roomId) return;
+
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+
+    const client = connectedClients.get(socket.id);
+    if (!client) return;
+
+    // Validate message
+    if (!message || typeof message !== 'string') return;
+
+    const trimmedMessage = message.trim();
+    if (trimmedMessage.length === 0 || trimmedMessage.length > 200) return;
+
+    // Broadcast message to everyone in the room
+    io.to(socket.roomId).emit('chatMessage', {
+      senderId: socket.id,
+      senderName: client.name,
+      message: trimmedMessage,
+      timestamp: Date.now()
+    });
   });
 
   socket.on('undoMove', () => {

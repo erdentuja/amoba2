@@ -34,6 +34,9 @@ const victoryLeaveBtn = document.getElementById('victoryLeaveBtn');
 const newGameRequestModal = document.getElementById('newGameRequestModal');
 const acceptNewGameBtn = document.getElementById('acceptNewGameBtn');
 const declineNewGameBtn = document.getElementById('declineNewGameBtn');
+const chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const chatSendBtn = document.getElementById('chatSendBtn');
 
 // Game state
 let socket = null;
@@ -242,6 +245,11 @@ function initSocketConnection() {
     // Handle messages
     socket.on('message', (msg) => {
       showMessage(msg);
+    });
+
+    // Handle chat messages
+    socket.on('chatMessage', (data) => {
+      addChatMessage(data);
     });
 
     // Handle spectator joined
@@ -511,6 +519,7 @@ function leaveGame() {
   }
 
   stopTimer();
+  clearChat();
   gameArea.style.display = 'none';
   lobby.style.display = 'flex';
   gameState = null;
@@ -1087,6 +1096,60 @@ function clearConfetti() {
   if (container) {
     container.innerHTML = '';
   }
+}
+
+// Chat functions
+function sendChatMessage() {
+  const message = chatInput.value.trim();
+
+  if (!message || !socket || !socket.roomId) return;
+
+  socket.emit('chatMessage', { message });
+  chatInput.value = '';
+}
+
+function addChatMessage(data) {
+  const messageDiv = document.createElement('div');
+  const isOwnMessage = data.senderId === socket.id;
+  const isSystemMessage = data.senderId === 'system';
+
+  messageDiv.className = `chat-message ${isSystemMessage ? 'system' : isOwnMessage ? 'own' : 'other'}`;
+
+  if (!isSystemMessage) {
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'chat-message-header';
+    headerDiv.textContent = data.senderName;
+    messageDiv.appendChild(headerDiv);
+  }
+
+  const bubbleDiv = document.createElement('div');
+  bubbleDiv.className = 'chat-message-bubble';
+  bubbleDiv.textContent = data.message;
+  messageDiv.appendChild(bubbleDiv);
+
+  chatMessages.appendChild(messageDiv);
+
+  // Auto-scroll to bottom
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function clearChat() {
+  if (chatMessages) {
+    chatMessages.innerHTML = '';
+  }
+}
+
+// Chat event listeners
+if (chatSendBtn) {
+  chatSendBtn.addEventListener('click', sendChatMessage);
+}
+
+if (chatInput) {
+  chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      sendChatMessage();
+    }
+  });
 }
 
 // Start the game
