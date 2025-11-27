@@ -16,6 +16,10 @@ const roomsListDiv = document.getElementById('roomsList');
 const undoBtn = document.getElementById('undoBtn');
 const resetBtn = document.getElementById('resetBtn');
 const leaveBtn = document.getElementById('leaveBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const welcomePlayerName = document.getElementById('welcomePlayerName');
+const lobbyOnlinePlayersList = document.getElementById('lobbyOnlinePlayersList');
+const lobbyOnlineCount = document.getElementById('lobbyOnlineCount');
 const canvas = document.getElementById('gameBoard');
 const ctx = canvas.getContext('2d');
 const currentTurnDiv = document.getElementById('currentTurn');
@@ -165,12 +169,23 @@ function initSocketConnection() {
       updateRoomsList(rooms);
     });
 
+    // Handle lobby players list updates
+    socket.on('lobbyPlayers', (players) => {
+      updateLobbyPlayersList(players);
+    });
+
     // Handle login success
     socket.on('loginSuccess', ({ playerName }) => {
       myPlayerName = playerName;
       isLoggedIn = true;
       loginScreen.style.display = 'none';
       lobby.style.display = 'flex';
+
+      // Update welcome section
+      if (welcomePlayerName) {
+        welcomePlayerName.textContent = playerName;
+      }
+
       console.log('Logged in as:', playerName);
     });
 
@@ -206,6 +221,7 @@ function setupEventListeners() {
   undoBtn.addEventListener('click', undoMove);
   resetBtn.addEventListener('click', resetGame);
   leaveBtn.addEventListener('click', leaveGame);
+  logoutBtn.addEventListener('click', handleLogout);
   canvas.addEventListener('click', handleCanvasClick);
 }
 
@@ -274,6 +290,53 @@ function updateRoomsList(rooms) {
     `;
     roomsListDiv.appendChild(roomDiv);
   });
+}
+
+// Update lobby players list
+function updateLobbyPlayersList(players) {
+  if (lobbyOnlineCount) {
+    lobbyOnlineCount.textContent = players.length;
+  }
+
+  if (!lobbyOnlinePlayersList) return;
+
+  if (players.length === 0) {
+    lobbyOnlinePlayersList.innerHTML = '<p class="no-players">Nincsenek online játékosok...</p>';
+    return;
+  }
+
+  lobbyOnlinePlayersList.innerHTML = '';
+  players.forEach(player => {
+    const playerDiv = document.createElement('div');
+    playerDiv.className = 'lobby-player-item';
+
+    const statusText = player.room ? `Játékban: ${player.room}` : 'Lobbiban';
+    const isCurrentPlayer = player.socketId === socket.id;
+
+    playerDiv.innerHTML = `
+      <div class="lobby-player-info">
+        <span class="lobby-player-name">${isCurrentPlayer ? '👤 ' : ''}${player.name}${isCurrentPlayer ? ' (Te)' : ''}</span>
+        <span class="lobby-player-status">${statusText}</span>
+      </div>
+      ${isAdmin && !isCurrentPlayer ? `<button class="btn btn-danger" onclick="kickPlayerFromLobby('${player.socketId}')">Kick</button>` : ''}
+    `;
+    lobbyOnlinePlayersList.appendChild(playerDiv);
+  });
+}
+
+// Kick player from lobby (admin only)
+function kickPlayerFromLobby(socketId) {
+  if (!isAdmin) return;
+  if (confirm('Biztosan kickelni szeretnéd ezt a játékost?')) {
+    socket.emit('adminKickPlayer', { targetSocketId: socketId });
+  }
+}
+
+// Handle logout
+function handleLogout() {
+  if (confirm('Biztosan ki szeretnél lépni?')) {
+    location.reload();
+  }
 }
 
 // Join existing room
@@ -632,6 +695,9 @@ function setupAdminListeners() {
 
     // Request timer settings
     socket.emit('adminGetTimerSettings');
+
+    // Request online players for admin panel
+    socket.emit('adminGetOnlinePlayers');
   });
 
   socket.on('adminLoginFailed', ({ error }) => {
