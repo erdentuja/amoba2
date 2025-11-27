@@ -38,6 +38,7 @@ class GameRoom {
     this.currentPlayer = 0; // 0 or 1
     this.gameOver = false;
     this.winner = null;
+    this.winningPieces = null;
     this.moveHistory = []; // [{row, col, symbol, player}, ...]
     this.timer = null;
     this.timerEndTime = null;
@@ -77,10 +78,12 @@ class GameRoom {
     this.clearTimer();
 
     // Check for win
-    if (this.checkWin(row, col, symbol)) {
+    const winningPieces = this.checkWin(row, col, symbol);
+    if (winningPieces) {
       this.gameOver = true;
       this.winner = this.players[this.currentPlayer];
-      return { success: true, gameOver: true, winner: this.winner };
+      this.winningPieces = winningPieces;
+      return { success: true, gameOver: true, winner: this.winner, winningPieces: winningPieces };
     }
 
     // Check for draw
@@ -104,6 +107,7 @@ class GameRoom {
 
     for (const [dx, dy] of directions) {
       let count = 1;
+      const winningPieces = [[row, col]]; // Start with the current piece
 
       // Check positive direction
       for (let i = 1; i < 5; i++) {
@@ -111,6 +115,7 @@ class GameRoom {
         const newCol = col + dy * i;
         if (newRow >= 0 && newRow < this.boardSize && newCol >= 0 && newCol < this.boardSize && this.board[newRow][newCol] === symbol) {
           count++;
+          winningPieces.push([newRow, newCol]);
         } else {
           break;
         }
@@ -122,15 +127,19 @@ class GameRoom {
         const newCol = col - dy * i;
         if (newRow >= 0 && newRow < this.boardSize && newCol >= 0 && newCol < this.boardSize && this.board[newRow][newCol] === symbol) {
           count++;
+          winningPieces.push([newRow, newCol]);
         } else {
           break;
         }
       }
 
-      if (count >= 5) return true;
+      if (count >= 5) {
+        // Return only the first 5 pieces (in case there are more than 5 in a row)
+        return winningPieces.slice(0, 5);
+      }
     }
 
-    return false;
+    return null;
   }
 
   isBoardFull() {
@@ -199,6 +208,7 @@ class GameRoom {
     this.currentPlayer = 0;
     this.gameOver = false;
     this.winner = null;
+    this.winningPieces = null;
     this.moveHistory = [];
     this.clearTimer();
   }
@@ -211,6 +221,7 @@ class GameRoom {
       currentPlayer: this.currentPlayer,
       gameOver: this.gameOver,
       winner: this.winner,
+      winningPieces: this.winningPieces,
       canUndo: this.moveHistory.length > 0 && !this.gameOver,
       timerEnabled: globalTimerSettings.enabled,
       timerDuration: globalTimerSettings.duration,

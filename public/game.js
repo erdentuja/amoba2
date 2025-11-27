@@ -37,6 +37,8 @@ let myPlayerName = null;
 let isLoggedIn = false;
 let isAdmin = false;
 let timerInterval = null;
+let winningAnimationFrame = 0;
+let animationInterval = null;
 
 // Sound system
 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -493,17 +495,28 @@ function updateGameDisplay() {
     if (gameState.winner) {
       currentTurnDiv.textContent = `🏆 ${gameState.winner.name} nyert!`;
       currentTurnDiv.style.color = '#4CAF50';
+
+      // Start winning animation
+      startWinningAnimation();
+
+      // Show victory modal
+      showVictoryModal(gameState.winner);
     } else {
       currentTurnDiv.textContent = '🤝 Döntetlen!';
       currentTurnDiv.style.color = '#FF9800';
     }
-  } else if (gameState.players.length < 2) {
-    currentTurnDiv.textContent = 'Várakozás másik játékosra...';
-    currentTurnDiv.style.color = '#999';
   } else {
-    const currentPlayer = gameState.players[gameState.currentPlayer];
-    currentTurnDiv.textContent = `${currentPlayer.name} következik (${currentPlayer.symbol})`;
-    currentTurnDiv.style.color = '#667eea';
+    // Stop winning animation if game is not over
+    stopWinningAnimation();
+
+    if (gameState.players.length < 2) {
+      currentTurnDiv.textContent = 'Várakozás másik játékosra...';
+      currentTurnDiv.style.color = '#999';
+    } else {
+      const currentPlayer = gameState.players[gameState.currentPlayer];
+      currentTurnDiv.textContent = `${currentPlayer.name} következik (${currentPlayer.symbol})`;
+      currentTurnDiv.style.color = '#667eea';
+    }
   }
 
   // Update undo button
@@ -524,6 +537,25 @@ function updateGameDisplay() {
 
   // Draw the board
   drawBoard();
+}
+
+// Start winning animation
+function startWinningAnimation() {
+  if (animationInterval) return; // Already running
+
+  animationInterval = setInterval(() => {
+    winningAnimationFrame++;
+    drawBoard();
+  }, 50); // 20 FPS animation
+}
+
+// Stop winning animation
+function stopWinningAnimation() {
+  if (animationInterval) {
+    clearInterval(animationInterval);
+    animationInterval = null;
+    winningAnimationFrame = 0;
+  }
 }
 
 function drawBoard() {
@@ -573,17 +605,26 @@ function drawBoard() {
       for (let col = 0; col < BOARD_SIZE; col++) {
         const cell = gameState.board[row][col];
         if (cell) {
-          drawPiece(row, col, cell);
+          // Check if this piece is a winning piece
+          const isWinningPiece = gameState.winningPieces &&
+            gameState.winningPieces.some(([r, c]) => r === row && c === col);
+          drawPiece(row, col, cell, isWinningPiece);
         }
       }
     }
   }
 }
 
-function drawPiece(row, col, symbol) {
+function drawPiece(row, col, symbol, isWinningPiece = false) {
   const x = col * CELL_SIZE + CELL_SIZE / 2;
   const y = row * CELL_SIZE + CELL_SIZE / 2;
-  const radius = CELL_SIZE / 2 - 5;
+  let radius = CELL_SIZE / 2 - 5;
+
+  // Pulsing effect for winning pieces
+  if (isWinningPiece) {
+    const pulseScale = 1 + Math.sin(winningAnimationFrame * 0.15) * 0.15;
+    radius = radius * pulseScale;
+  }
 
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -591,23 +632,49 @@ function drawPiece(row, col, symbol) {
   if (symbol === 'X') {
     // Black stone
     const gradient = ctx.createRadialGradient(x - 5, y - 5, 5, x, y, radius);
-    gradient.addColorStop(0, '#555');
-    gradient.addColorStop(1, '#000');
+    if (isWinningPiece) {
+      // Gold glow for winning piece
+      gradient.addColorStop(0, '#FFD700');
+      gradient.addColorStop(0.3, '#333');
+      gradient.addColorStop(1, '#000');
+    } else {
+      gradient.addColorStop(0, '#555');
+      gradient.addColorStop(1, '#000');
+    }
     ctx.fillStyle = gradient;
     ctx.fill();
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = isWinningPiece ? '#FFD700' : '#000';
+    ctx.lineWidth = isWinningPiece ? 4 : 2;
     ctx.stroke();
   } else {
     // White stone
     const gradient = ctx.createRadialGradient(x - 5, y - 5, 5, x, y, radius);
-    gradient.addColorStop(0, '#fff');
-    gradient.addColorStop(1, '#ddd');
+    if (isWinningPiece) {
+      // Gold glow for winning piece
+      gradient.addColorStop(0, '#FFD700');
+      gradient.addColorStop(0.3, '#fff');
+      gradient.addColorStop(1, '#ddd');
+    } else {
+      gradient.addColorStop(0, '#fff');
+      gradient.addColorStop(1, '#ddd');
+    }
     ctx.fillStyle = gradient;
     ctx.fill();
-    ctx.strokeStyle = '#999';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = isWinningPiece ? '#FFD700' : '#999';
+    ctx.lineWidth = isWinningPiece ? 4 : 2;
     ctx.stroke();
+  }
+
+  // Add extra glow effect for winning pieces
+  if (isWinningPiece) {
+    ctx.shadowColor = '#FFD700';
+    ctx.shadowBlur = 20;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
   }
 }
 
@@ -789,6 +856,61 @@ function kickPlayer(socketId) {
 function closeRoom(roomId) {
   if (confirm(`Biztosan bezárod a(z) "${roomId}" szobát?`)) {
     socket.emit('adminCloseRoom', { roomId });
+  }
+}
+
+// Victory modal functions
+function showVictoryModal(winner) {
+  const victoryModal = document.getElementById('victoryModal');
+  const victoryWinnerName = document.getElementById('victoryWinnerName');
+  const victoryCloseBtn = document.getElementById('victoryCloseBtn');
+
+  if (!victoryModal || !victoryWinnerName) return;
+
+  victoryWinnerName.textContent = winner.name;
+  victoryModal.style.display = 'flex';
+
+  // Create confetti effect
+  createConfetti();
+
+  // Close button handler
+  victoryCloseBtn.onclick = () => {
+    victoryModal.style.display = 'none';
+    clearConfetti();
+  };
+
+  // Close on click outside
+  victoryModal.onclick = (e) => {
+    if (e.target === victoryModal) {
+      victoryModal.style.display = 'none';
+      clearConfetti();
+    }
+  };
+}
+
+// Confetti effect
+function createConfetti() {
+  const container = document.getElementById('confettiContainer');
+  if (!container) return;
+
+  const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE'];
+  const confettiCount = 100;
+
+  for (let i = 0; i < confettiCount; i++) {
+    const confetti = document.createElement('div');
+    confetti.className = 'confetti';
+    confetti.style.left = Math.random() * 100 + '%';
+    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    confetti.style.animationDelay = Math.random() * 3 + 's';
+    confetti.style.animationDuration = (Math.random() * 3 + 2) + 's';
+    container.appendChild(confetti);
+  }
+}
+
+function clearConfetti() {
+  const container = document.getElementById('confettiContainer');
+  if (container) {
+    container.innerHTML = '';
   }
 }
 
