@@ -18,6 +18,25 @@ let globalAISettings = {
   aiVsAiEnabled: false // AI vs AI mode toggle
 };
 
+// Balambér chatbot messages
+const balamberMessages = [
+  'Sziasztok! Balambér vagyok, a ti virtuális játékmesteretek! 🎮',
+  'Ki mer velem megmérkőzni? Én aztán nem ismerek kegyelmet! 😎',
+  'Tudtátok, hogy az öt egy sorban a harmadik legjobb dolog a világon? Az első kettő titkos. 🤫',
+  'Néha csak ülök itt és gondolkodom... Mit is csinálok én itt? 🤔',
+  'A legjobb játékosok mindig a lobbyban kezdik! És itt vagyok én is! 😄',
+  'Psszt... Próbáltátok már az AI vs AI módot? Lenyűgöző! 🤖⚔️🤖',
+  'Mindig tanulok új stratégiákat. Ti is így csináljátok? 📚',
+  'Ígérem, nem spiccelem ki a játékokat... Vagy mégis? 😈',
+  'Halló? Van itt valaki? Vagy csak én beszélek magamban megint? 👻',
+  'Fun fact: Az amőba neve a latin "amoeba"-ból származik. Most mindannyian okosabbak lettünk! 🧠',
+  'Szerintem ma mindenkinek szerencséje lesz! Főleg nekem! 🍀',
+  'Emlékeztek még mikor először játszottatok amőbát? Én igen, tegnap volt. 😅',
+  'A győzelem kulcsa: stratégia, türelem, és egy csipet szerencse! ✨',
+  'Néha csak nézem a játékokat és tanulok belőlük. Ti is így csináljátok? 👀',
+  'Ki szereti a 15x15-ös táblát? Én azt mondom, minél nagyobb, annál jobb! 🎯'
+];
+
 // Track connected clients
 const connectedClients = new Map(); // socketId -> {name, isAdmin, connectedAt, createdRoom}
 const loggedInPlayers = new Map(); // socketId -> {name, loggedInAt}
@@ -1049,6 +1068,29 @@ io.on('connection', (socket) => {
     });
   });
 
+  socket.on('lobbyChatMessage', ({ message }) => {
+    const client = connectedClients.get(socket.id);
+    if (!client) return;
+
+    // Validate message
+    if (!message || typeof message !== 'string') return;
+
+    const trimmedMessage = message.trim();
+    if (trimmedMessage.length === 0 || trimmedMessage.length > 200) return;
+
+    // Broadcast message to everyone in lobby (not in a room)
+    connectedClients.forEach((c, sid) => {
+      if (!c.room && !c.isAdmin) {
+        io.to(sid).emit('lobbyChatMessage', {
+          senderId: socket.id,
+          senderName: client.name,
+          message: trimmedMessage,
+          timestamp: Date.now()
+        });
+      }
+    });
+  });
+
   socket.on('undoMove', () => {
     if (!socket.roomId) return;
 
@@ -1302,7 +1344,49 @@ io.on('connection', (socket) => {
   });
 });
 
+// Balambér chatbot - sends random messages to lobby
+function sendBalamberMessage() {
+  // Check if there are players in lobby (not in a room and not admin)
+  const lobbyPlayers = [];
+  connectedClients.forEach((client, sid) => {
+    if (!client.room && !client.isAdmin) {
+      lobbyPlayers.push(sid);
+    }
+  });
+
+  // Only send if there are players in lobby
+  if (lobbyPlayers.length > 0) {
+    const randomMessage = balamberMessages[Math.floor(Math.random() * balamberMessages.length)];
+
+    lobbyPlayers.forEach(sid => {
+      io.to(sid).emit('lobbyChatMessage', {
+        senderId: 'bot',
+        senderName: '🤖 Balambér',
+        message: randomMessage,
+        timestamp: Date.now()
+      });
+    });
+
+    console.log(`Balambér said: "${randomMessage}" to ${lobbyPlayers.length} players`);
+  }
+}
+
+// Start Balambér chatbot (sends message every 60-120 seconds)
+function scheduleNextBalamberMessage() {
+  const delay = 60000 + Math.random() * 60000; // 60-120 seconds
+  setTimeout(() => {
+    sendBalamberMessage();
+    scheduleNextBalamberMessage();
+  }, delay);
+}
+
 http.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Open http://localhost:${PORT} in your browser`);
+
+  // Start Balambér chatbot after 30 seconds
+  setTimeout(() => {
+    console.log('🤖 Balambér chatbot activated!');
+    scheduleNextBalamberMessage();
+  }, 30000);
 });

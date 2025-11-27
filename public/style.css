@@ -1122,3 +1122,79 @@ header h1 {
     padding: 10px 20px;
   }
 }
+
+/* Lobby Chat Styles */
+.lobby-chat-card {
+  grid-column: 1 / -1;
+  max-width: 100%;
+}
+
+.lobby-chat-messages {
+  min-height: 250px;
+  max-height: 350px;
+  overflow-y: auto;
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lobby-chat-input-container {
+  display: flex;
+  gap: 10px;
+}
+
+/* Lobby chat messages use same styles as game chat */
+.lobby-chat-messages .chat-message {
+  display: flex;
+  flex-direction: column;
+  max-width: 80%;
+  animation: slideIn 0.2s ease-out;
+}
+
+.lobby-chat-messages .chat-message.own {
+  align-self: flex-end;
+}
+
+.lobby-chat-messages .chat-message.other {
+  align-self: flex-start;
+}
+
+.lobby-chat-messages .chat-message.bot {
+  align-self: flex-start;
+  max-width: 85%;
+}
+
+.lobby-chat-messages .chat-message.bot .chat-message-header {
+  color: #f39c12;
+  font-weight: 700;
+}
+
+.lobby-chat-messages .chat-message.bot .chat-message-bubble {
+  background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+  color: white;
+  border-radius: 15px 15px 15px 5px;
+  box-shadow: 0 2px 8px rgba(243, 156, 18, 0.3);
+}
+
+/* Scrollbar for lobby chat */
+.lobby-chat-messages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.lobby-chat-messages::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.lobby-chat-messages::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.lobby-chat-messages::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
