@@ -118,8 +118,17 @@
               <option value="19">19x19 (Nagy)</option>
             </select>
           </div>
+          <div class="form-group">
+            <label for="gameMode">Játék mód:</label>
+            <select id="gameMode" class="board-size-select">
+              <option value="pvp">👥 Játékos vs Játékos</option>
+              <option value="ai-easy">🤖 AI (Könnyű)</option>
+              <option value="ai-medium">🤖 AI (Közepes)</option>
+              <option value="ai-hard">🤖 AI (Nehéz)</option>
+            </select>
+          </div>
           <button id="createRoomBtn" class="btn btn-primary">Szoba létrehozása</button>
-          <p class="hint">A szoba létrehozása után csatlakozz hozzá a várakozó szobák listájából!</p>
+          <p class="hint">AI módban automatikusan kezdheted a játékot!</p>
         </div>
 
         <div class="card rooms-list-card">

@@ -245,6 +245,7 @@ function handleLogin() {
 function handleCreateRoom() {
   const roomId = roomIdInput.value.trim();
   const boardSize = parseInt(boardSizeInput.value);
+  const gameMode = document.getElementById('gameMode').value;
 
   if (!roomId) {
     alert('Kérlek add meg a szoba azonosítót!');
@@ -256,7 +257,7 @@ function handleCreateRoom() {
     return;
   }
 
-  socket.emit('createRoom', { roomId, boardSize });
+  socket.emit('createRoom', { roomId, boardSize, gameMode });
   roomIdInput.value = '';
 }
 

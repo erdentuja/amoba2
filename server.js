@@ -27,12 +27,226 @@ app.get('/', (req, res) => {
 // Game state management
 const rooms = new Map();
 
+// AI Logic - Minimax with Alpha-Beta Pruning
+class GomokuAI {
+  constructor(difficulty = 'medium') {
+    this.difficulty = difficulty;
+    this.maxDepth = this.getDepthByDifficulty(difficulty);
+  }
+
+  getDepthByDifficulty(difficulty) {
+    switch(difficulty) {
+      case 'easy': return 1;
+      case 'medium': return 2;
+      case 'hard': return 3;
+      default: return 2;
+    }
+  }
+
+  // Evaluate board position
+  evaluateBoard(board, boardSize, aiSymbol, playerSymbol) {
+    let score = 0;
+
+    // Check all lines (horizontal, vertical, diagonals)
+    const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+
+    for (let row = 0; row < boardSize; row++) {
+      for (let col = 0; col < boardSize; col++) {
+        for (const [dx, dy] of directions) {
+          const lineScore = this.evaluateLine(board, boardSize, row, col, dx, dy, aiSymbol, playerSymbol);
+          score += lineScore;
+        }
+      }
+    }
+
+    return score;
+  }
+
+  // Evaluate a single line
+  evaluateLine(board, boardSize, row, col, dx, dy, aiSymbol, playerSymbol) {
+    let aiCount = 0;
+    let playerCount = 0;
+    let empty = 0;
+
+    for (let i = 0; i < 5; i++) {
+      const r = row + i * dx;
+      const c = col + i * dy;
+
+      if (r < 0 || r >= boardSize || c < 0 || c >= boardSize) return 0;
+
+      const cell = board[r][c];
+      if (cell === aiSymbol) aiCount++;
+      else if (cell === playerSymbol) playerCount++;
+      else empty++;
+    }
+
+    // Can't make 5 in a row here
+    if (aiCount > 0 && playerCount > 0) return 0;
+
+    // Score based on pattern
+    if (aiCount === 5) return 100000;  // Win
+    if (playerCount === 5) return -100000;  // Loss
+    if (aiCount === 4 && empty === 1) return 10000;  // 4 in a row (almost win)
+    if (playerCount === 4 && empty === 1) return -9000;  // Block opponent's 4
+    if (aiCount === 3 && empty === 2) return 1000;  // 3 in a row
+    if (playerCount === 3 && empty === 2) return -900;  // Block opponent's 3
+    if (aiCount === 2 && empty === 3) return 100;  // 2 in a row
+    if (playerCount === 2 && empty === 3) return -90;  // Block opponent's 2
+
+    return 0;
+  }
+
+  // Get all possible moves (with smart filtering)
+  getPossibleMoves(board, boardSize) {
+    const moves = [];
+    const occupied = [];
+
+    // Find all occupied cells
+    for (let row = 0; row < boardSize; row++) {
+      for (let col = 0; col < boardSize; col++) {
+        if (board[row][col] !== null) {
+          occupied.push([row, col]);
+        }
+      }
+    }
+
+    // If board is empty, start in center
+    if (occupied.length === 0) {
+      const center = Math.floor(boardSize / 2);
+      return [[center, center]];
+    }
+
+    // Get cells near occupied ones (within 2 cells)
+    const nearbyMoves = new Set();
+    for (const [row, col] of occupied) {
+      for (let dr = -2; dr <= 2; dr++) {
+        for (let dc = -2; dc <= 2; dc++) {
+          const r = row + dr;
+          const c = col + dc;
+          if (r >= 0 && r < boardSize && c >= 0 && c < boardSize && board[r][c] === null) {
+            nearbyMoves.add(`${r},${c}`);
+          }
+        }
+      }
+    }
+
+    nearbyMoves.forEach(key => {
+      const [r, c] = key.split(',').map(Number);
+      moves.push([r, c]);
+    });
+
+    return moves.length > 0 ? moves : this.getAllEmptyCells(board, boardSize);
+  }
+
+  getAllEmptyCells(board, boardSize) {
+    const moves = [];
+    for (let row = 0; row < boardSize; row++) {
+      for (let col = 0; col < boardSize; col++) {
+        if (board[row][col] === null) {
+          moves.push([row, col]);
+        }
+      }
+    }
+    return moves;
+  }
+
+  // Minimax with Alpha-Beta Pruning
+  minimax(board, boardSize, depth, alpha, beta, isMaximizing, aiSymbol, playerSymbol) {
+    // Check terminal states
+    const winner = this.checkWinner(board, boardSize);
+    if (winner === aiSymbol) return 100000;
+    if (winner === playerSymbol) return -100000;
+    if (depth === 0) {
+      return this.evaluateBoard(board, boardSize, aiSymbol, playerSymbol);
+    }
+
+    const moves = this.getPossibleMoves(board, boardSize);
+    if (moves.length === 0) return 0;  // Draw
+
+    if (isMaximizing) {
+      let maxEval = -Infinity;
+      for (const [row, col] of moves) {
+        board[row][col] = aiSymbol;
+        const evaluation = this.minimax(board, boardSize, depth - 1, alpha, beta, false, aiSymbol, playerSymbol);
+        board[row][col] = null;
+        maxEval = Math.max(maxEval, evaluation);
+        alpha = Math.max(alpha, evaluation);
+        if (beta <= alpha) break;  // Beta cutoff
+      }
+      return maxEval;
+    } else {
+      let minEval = Infinity;
+      for (const [row, col] of moves) {
+        board[row][col] = playerSymbol;
+        const evaluation = this.minimax(board, boardSize, depth - 1, alpha, beta, true, aiSymbol, playerSymbol);
+        board[row][col] = null;
+        minEval = Math.min(minEval, evaluation);
+        beta = Math.min(beta, evaluation);
+        if (beta <= alpha) break;  // Alpha cutoff
+      }
+      return minEval;
+    }
+  }
+
+  // Check if there's a winner
+  checkWinner(board, boardSize) {
+    const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+
+    for (let row = 0; row < boardSize; row++) {
+      for (let col = 0; col < boardSize; col++) {
+        const symbol = board[row][col];
+        if (symbol === null) continue;
+
+        for (const [dx, dy] of directions) {
+          let count = 1;
+          for (let i = 1; i < 5; i++) {
+            const r = row + i * dx;
+            const c = col + i * dy;
+            if (r < 0 || r >= boardSize || c < 0 || c >= boardSize || board[r][c] !== symbol) break;
+            count++;
+          }
+          if (count >= 5) return symbol;
+        }
+      }
+    }
+    return null;
+  }
+
+  // Get best move
+  getBestMove(board, boardSize, aiSymbol, playerSymbol) {
+    const moves = this.getPossibleMoves(board, boardSize);
+    if (moves.length === 0) return null;
+
+    let bestMove = moves[0];
+    let bestValue = -Infinity;
+
+    // For easy mode, add some randomness
+    if (this.difficulty === 'easy' && Math.random() < 0.4) {
+      return moves[Math.floor(Math.random() * moves.length)];
+    }
+
+    for (const [row, col] of moves) {
+      board[row][col] = aiSymbol;
+      const moveValue = this.minimax(board, boardSize, this.maxDepth, -Infinity, Infinity, false, aiSymbol, playerSymbol);
+      board[row][col] = null;
+
+      if (moveValue > bestValue) {
+        bestValue = moveValue;
+        bestMove = [row, col];
+      }
+    }
+
+    return bestMove;
+  }
+}
+
 class GameRoom {
-  constructor(roomId, boardSize = 15, creatorId = null, creatorName = null) {
+  constructor(roomId, boardSize = 15, creatorId = null, creatorName = null, gameMode = 'pvp') {
     this.roomId = roomId;
     this.boardSize = boardSize;
     this.creatorId = creatorId;
     this.creatorName = creatorName;
+    this.gameMode = gameMode;  // 'pvp', 'ai-easy', 'ai-medium', 'ai-hard'
     this.players = [];
     this.board = Array(boardSize).fill(null).map(() => Array(boardSize).fill(null));
     this.currentPlayer = 0; // 0 or 1
@@ -42,14 +256,51 @@ class GameRoom {
     this.moveHistory = []; // [{row, col, symbol, player}, ...]
     this.timer = null;
     this.timerEndTime = null;
+
+    // AI setup
+    if (gameMode.startsWith('ai-')) {
+      const difficulty = gameMode.replace('ai-', '');
+      this.ai = new GomokuAI(difficulty);
+      this.isAIGame = true;
+    } else {
+      this.ai = null;
+      this.isAIGame = false;
+    }
   }
 
   addPlayer(playerId, playerName) {
     if (this.players.length < 2) {
-      this.players.push({ id: playerId, name: playerName, symbol: this.players.length === 0 ? 'X' : 'O' });
+      this.players.push({ id: playerId, name: playerName, symbol: this.players.length === 0 ? 'X' : 'O', isAI: false });
+
+      // If this is an AI game and we just added the first player, add AI as second player
+      if (this.isAIGame && this.players.length === 1) {
+        const aiDifficulty = this.gameMode.replace('ai-', '');
+        const aiName = `AI (${aiDifficulty.charAt(0).toUpperCase() + aiDifficulty.slice(1)})`;
+        this.players.push({ id: 'AI', name: aiName, symbol: 'O', isAI: true });
+      }
+
       return true;
     }
     return false;
+  }
+
+  // Make AI move
+  makeAIMove() {
+    if (!this.isAIGame || this.gameOver || this.players.length < 2) return null;
+
+    const aiPlayer = this.players.find(p => p.isAI);
+    if (!aiPlayer) return null;
+
+    const aiPlayerIndex = this.players.indexOf(aiPlayer);
+    if (aiPlayerIndex !== this.currentPlayer) return null;
+
+    const aiSymbol = aiPlayer.symbol;
+    const playerSymbol = this.players.find(p => !p.isAI).symbol;
+
+    const [row, col] = this.ai.getBestMove(this.board, this.boardSize, aiSymbol, playerSymbol);
+
+    // Use the AI player's ID
+    return this.makeMove('AI', row, col);
   }
 
   removePlayer(playerId) {
@@ -340,7 +591,7 @@ io.on('connection', (socket) => {
   });
 
   // Create room (without joining)
-  socket.on('createRoom', ({ roomId, boardSize }) => {
+  socket.on('createRoom', ({ roomId, boardSize, gameMode }) => {
     const client = connectedClients.get(socket.id);
 
     if (!client) {
@@ -361,14 +612,15 @@ io.on('connection', (socket) => {
     }
 
     const size = boardSize || 15;
-    const newRoom = new GameRoom(roomId, size, socket.id, client.name);
+    const mode = gameMode || 'pvp';
+    const newRoom = new GameRoom(roomId, size, socket.id, client.name, mode);
     rooms.set(roomId, newRoom);
 
     // Track that this player created this room
     client.createdRoom = roomId;
 
-    socket.emit('roomCreated', { roomId, boardSize: size });
-    console.log(`Room ${roomId} created by ${client.name}`);
+    socket.emit('roomCreated', { roomId, boardSize: size, gameMode: mode });
+    console.log(`Room ${roomId} created by ${client.name} (mode: ${mode})`);
 
     // Broadcast updated rooms list
     broadcastRoomsList();
@@ -467,6 +719,24 @@ io.on('connection', (socket) => {
             io.to(socket.roomId).emit('gameState', room.getState());
           });
         });
+
+        // If it's an AI game and AI's turn, make AI move after a short delay
+        if (room.isAIGame && !room.gameOver) {
+          setTimeout(() => {
+            const aiResult = room.makeAIMove();
+            if (aiResult && aiResult.success) {
+              io.to(socket.roomId).emit('gameState', room.getState());
+
+              if (aiResult.gameOver) {
+                if (aiResult.draw) {
+                  io.to(socket.roomId).emit('message', "It's a draw!");
+                } else {
+                  io.to(socket.roomId).emit('message', `${aiResult.winner.name} wins!`);
+                }
+              }
+            }
+          }, 500);  // 500ms delay to make AI feel more natural
+        }
       }
     } else {
       socket.emit('error', result.error);
