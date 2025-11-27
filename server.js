@@ -283,16 +283,45 @@ class GameRoom {
 
     // AI setup
     if (gameMode.startsWith('ai-')) {
-      const difficulty = gameMode.replace('ai-', '');
-      this.ai = new GomokuAI(difficulty);
-      this.isAIGame = true;
+      if (gameMode === 'ai-vs-ai') {
+        // AI vs AI mode: create two AI players immediately
+        this.isAIVsAI = true;
+        this.isAIGame = false;
+        this.ai = new GomokuAI('medium'); // Default AI for both
+        this.status = 'in_progress'; // Start immediately
+
+        // Add two AI players
+        this.players.push({
+          id: 'AI1',
+          name: `${generateFunnyAIName('medium')} #1`,
+          symbol: 'X',
+          isAI: true
+        });
+        this.players.push({
+          id: 'AI2',
+          name: `${generateFunnyAIName('hard')} #2`,
+          symbol: 'O',
+          isAI: true
+        });
+      } else {
+        const difficulty = gameMode.replace('ai-', '');
+        this.ai = new GomokuAI(difficulty);
+        this.isAIGame = true;
+        this.isAIVsAI = false;
+      }
     } else {
       this.ai = null;
       this.isAIGame = false;
+      this.isAIVsAI = false;
     }
   }
 
   addPlayer(playerId, playerName) {
+    // Don't allow players to join AI vs AI games
+    if (this.isAIVsAI) {
+      return false;
+    }
+
     if (this.players.length < 2) {
       this.players.push({ id: playerId, name: playerName, symbol: this.players.length === 0 ? 'X' : 'O', isAI: false });
 
@@ -595,6 +624,58 @@ function broadcastLobbyPlayers() {
   io.emit('lobbyPlayers', playersList);
 }
 
+// Start AI vs AI automatic game
+function startAIvsAIGame(roomId) {
+  const room = rooms.get(roomId);
+  if (!room || !room.isAIVsAI) return;
+
+  console.log(`Starting AI vs AI game in room ${roomId}`);
+
+  // Broadcast initial game state
+  io.to(roomId).emit('gameState', room.getState());
+  io.to(roomId).emit('message', '🤖 AI vs AI játék kezdődik!');
+
+  // Function to make next AI move
+  function makeNextAIMove() {
+    if (room.gameOver) {
+      console.log(`AI vs AI game in room ${roomId} finished`);
+      return;
+    }
+
+    const currentPlayer = room.players[room.currentPlayer];
+    const otherPlayer = room.players[1 - room.currentPlayer];
+
+    // Make AI move
+    const [row, col] = room.ai.getBestMove(
+      room.board,
+      room.boardSize,
+      currentPlayer.symbol,
+      otherPlayer.symbol
+    );
+
+    const result = room.makeMove(currentPlayer.id, row, col);
+
+    if (result.success) {
+      // Broadcast updated state
+      io.to(roomId).emit('gameState', room.getState());
+
+      if (result.gameOver) {
+        if (result.draw) {
+          io.to(roomId).emit('message', '🤝 Döntetlen!');
+        } else {
+          io.to(roomId).emit('message', `🏆 ${result.winner.name} nyert!`);
+        }
+      } else {
+        // Schedule next move
+        setTimeout(makeNextAIMove, 800); // 800ms delay between moves
+      }
+    }
+  }
+
+  // Start the first move after a short delay
+  setTimeout(makeNextAIMove, 1000);
+}
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
@@ -672,6 +753,11 @@ io.on('connection', (socket) => {
 
     // Broadcast updated rooms list
     broadcastRoomsList();
+
+    // If AI vs AI mode, start the automatic game
+    if (mode === 'ai-vs-ai') {
+      startAIvsAIGame(roomId);
+    }
   });
 
   // Admin login
