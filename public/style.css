@@ -196,9 +196,11 @@ header h1 {
 
 .game-area {
   background: white;
-  padding: 30px;
+  padding: 20px;
   border-radius: 15px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .game-info {
@@ -250,10 +252,11 @@ header h1 {
 .board-container {
   display: flex;
   justify-content: center;
-  margin: 20px 0;
+  margin: 15px 0;
   background: #f9f9f9;
-  padding: 20px;
+  padding: 15px;
   border-radius: 10px;
+  overflow: auto;
 }
 
 #gameBoard {
@@ -262,6 +265,8 @@ header h1 {
   cursor: pointer;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
   display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 .game-controls {
@@ -575,7 +580,16 @@ header h1 {
   }
 
   .card {
-    padding: 25px;
+    padding: 20px;
+  }
+
+  .game-area {
+    padding: 15px;
+  }
+
+  .board-container {
+    padding: 10px;
+    margin: 10px 0;
   }
 
   #gameBoard {
@@ -590,9 +604,15 @@ header h1 {
 
   .game-controls {
     flex-direction: column;
+    gap: 10px;
   }
 
   .game-controls .btn {
     width: 100%;
+    padding: 10px 20px;
+  }
+
+  .game-info {
+    margin-bottom: 15px;
   }
 }

@@ -1,5 +1,5 @@
 // Game constants
-const CELL_SIZE = 50;
+const CELL_SIZE = 35; // Csökkentve a jobb illeszkedés érdekében
 let BOARD_SIZE = 15;
 let CANVAS_SIZE = BOARD_SIZE * CELL_SIZE;
 
