@@ -1102,7 +1102,7 @@ function clearConfetti() {
 function sendChatMessage() {
   const message = chatInput.value.trim();
 
-  if (!message || !socket || !socket.roomId) return;
+  if (!message || !socket) return;
 
   socket.emit('chatMessage', { message });
   chatInput.value = '';
