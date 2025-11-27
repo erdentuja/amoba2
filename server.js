@@ -27,6 +27,21 @@ app.get('/', (req, res) => {
 // Game state management
 const rooms = new Map();
 
+// Funny AI name generator
+function generateFunnyAIName(difficulty) {
+  const funnyNames = [
+    'Terminátor', 'SzuperAgy', 'Géniusz', 'Mesterlövész', 'Bajnok',
+    'Robotkommandó', 'Stratéga', 'Taktikus', 'Nagymester', 'Professzor',
+    'Kódoló', 'Számológép', 'Kvantum', 'Neuron', 'Algoritmus',
+    'Bináris Zseni', 'Logikai Ász', 'Következtető', 'Sakkóriás', 'Gondolkodó',
+    'Digitális Mester', 'Elektronagy', 'Megamind', 'Brainiac', 'Szuperkomputer',
+    'Kalkulátor', 'Problémamegoldó', 'Tervező', 'Kiborg', 'Neo'
+  ];
+
+  const randomName = funnyNames[Math.floor(Math.random() * funnyNames.length)];
+  return `${randomName} (AI)`;
+}
+
 // AI Logic - Minimax with Alpha-Beta Pruning
 class GomokuAI {
   constructor(difficulty = 'medium') {
@@ -253,6 +268,7 @@ class GameRoom {
     this.gameOver = false;
     this.winner = null;
     this.winningPieces = null;
+    this.lastMove = null; // {row, col} - track last move
     this.moveHistory = []; // [{row, col, symbol, player}, ...]
     this.timer = null;
     this.timerEndTime = null;
@@ -275,7 +291,7 @@ class GameRoom {
       // If this is an AI game and we just added the first player, add AI as second player
       if (this.isAIGame && this.players.length === 1) {
         const aiDifficulty = this.gameMode.replace('ai-', '');
-        const aiName = `AI (${aiDifficulty.charAt(0).toUpperCase() + aiDifficulty.slice(1)})`;
+        const aiName = generateFunnyAIName(aiDifficulty);
         this.players.push({ id: 'AI', name: aiName, symbol: 'O', isAI: true });
       }
 
@@ -316,6 +332,9 @@ class GameRoom {
 
     const symbol = this.players[this.currentPlayer].symbol;
     this.board[row][col] = symbol;
+
+    // Track last move
+    this.lastMove = { row, col };
 
     // Save move to history for undo
     this.moveHistory.push({
@@ -460,6 +479,7 @@ class GameRoom {
     this.gameOver = false;
     this.winner = null;
     this.winningPieces = null;
+    this.lastMove = null;
     this.moveHistory = [];
     this.clearTimer();
   }
@@ -473,6 +493,7 @@ class GameRoom {
       gameOver: this.gameOver,
       winner: this.winner,
       winningPieces: this.winningPieces,
+      lastMove: this.lastMove,
       canUndo: this.moveHistory.length > 0 && !this.gameOver,
       timerEnabled: globalTimerSettings.enabled,
       timerDuration: globalTimerSettings.duration,

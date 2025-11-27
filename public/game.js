@@ -609,14 +609,19 @@ function drawBoard() {
           // Check if this piece is a winning piece
           const isWinningPiece = gameState.winningPieces &&
             gameState.winningPieces.some(([r, c]) => r === row && c === col);
-          drawPiece(row, col, cell, isWinningPiece);
+
+          // Check if this is the last move
+          const isLastMove = gameState.lastMove &&
+            gameState.lastMove.row === row && gameState.lastMove.col === col;
+
+          drawPiece(row, col, cell, isWinningPiece, isLastMove);
         }
       }
     }
   }
 }
 
-function drawPiece(row, col, symbol, isWinningPiece = false) {
+function drawPiece(row, col, symbol, isWinningPiece = false, isLastMove = false) {
   const x = col * CELL_SIZE + CELL_SIZE / 2;
   const y = row * CELL_SIZE + CELL_SIZE / 2;
   let radius = CELL_SIZE / 2 - 5;
@@ -676,6 +681,19 @@ function drawPiece(row, col, symbol, isWinningPiece = false) {
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.shadowBlur = 0;
+  }
+
+  // Draw last move indicator (small red dot)
+  if (isLastMove && !isWinningPiece) {
+    ctx.fillStyle = '#FF4444';
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Add white border for visibility
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 }
 
