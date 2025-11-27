@@ -188,6 +188,11 @@ header h1 {
   color: white;
 }
 
+.btn-warning {
+  background: #ff9800;
+  color: white;
+}
+
 .hint {
   margin-top: 20px;
   font-size: 14px;
@@ -392,6 +397,11 @@ header h1 {
 
 .room-status.waiting {
   background: #4CAF50;
+  color: white;
+}
+
+.room-status.in-progress {
+  background: #2196F3;
   color: white;
 }
 

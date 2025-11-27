@@ -9,13 +9,13 @@ const loginPlayerNameInput = document.getElementById('loginPlayerName');
 const loginBtn = document.getElementById('loginBtn');
 const lobby = document.getElementById('lobby');
 const gameArea = document.getElementById('gameArea');
-const roomIdInput = document.getElementById('roomId');
 const boardSizeInput = document.getElementById('boardSize');
 const createRoomBtn = document.getElementById('createRoomBtn');
 const roomsListDiv = document.getElementById('roomsList');
 const undoBtn = document.getElementById('undoBtn');
 const resetBtn = document.getElementById('resetBtn');
 const leaveBtn = document.getElementById('leaveBtn');
+const leaveSpectatorBtn = document.getElementById('leaveSpectatorBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const welcomePlayerName = document.getElementById('welcomePlayerName');
 const lobbyOnlinePlayersList = document.getElementById('lobbyOnlinePlayersList');
@@ -36,6 +36,7 @@ let myPlayerId = null;
 let myPlayerName = null;
 let isLoggedIn = false;
 let isAdmin = false;
+let isSpectator = false;
 let timerInterval = null;
 let winningAnimationFrame = 0;
 let animationInterval = null;
@@ -202,6 +203,52 @@ function initSocketConnection() {
       alert(error);
     });
 
+    // Handle spectator joined
+    socket.on('spectatorJoined', ({ roomId }) => {
+      isSpectator = true;
+      lobby.style.display = 'none';
+      gameArea.style.display = 'flex';
+
+      // Show leave spectator button, hide game controls for spectators
+      leaveSpectatorBtn.style.display = 'inline-block';
+      undoBtn.style.display = 'none';
+      resetBtn.style.display = 'none';
+      leaveBtn.style.display = 'none';
+
+      showMessage(`Nézői módban vagy a ${roomId} szobában`);
+    });
+
+    // Handle left spectator mode
+    socket.on('leftSpectator', () => {
+      isSpectator = false;
+      gameArea.style.display = 'none';
+      lobby.style.display = 'flex';
+
+      // Reset button visibility
+      leaveSpectatorBtn.style.display = 'none';
+      undoBtn.style.display = 'inline-block';
+      resetBtn.style.display = 'inline-block';
+      leaveBtn.style.display = 'inline-block';
+
+      gameState = null;
+    });
+
+    // Handle room closed
+    socket.on('roomClosed', ({ message }) => {
+      alert(message || 'A szoba bezárva');
+      isSpectator = false;
+      gameArea.style.display = 'none';
+      lobby.style.display = 'flex';
+
+      // Reset button visibility
+      leaveSpectatorBtn.style.display = 'none';
+      undoBtn.style.display = 'inline-block';
+      resetBtn.style.display = 'inline-block';
+      leaveBtn.style.display = 'inline-block';
+
+      gameState = null;
+    });
+
     setupAdminListeners();
   }
 }
@@ -215,14 +262,12 @@ function setupEventListeners() {
 
   // Room creation
   createRoomBtn.addEventListener('click', handleCreateRoom);
-  roomIdInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') handleCreateRoom();
-  });
 
   // Game controls
   undoBtn.addEventListener('click', undoMove);
   resetBtn.addEventListener('click', resetGame);
   leaveBtn.addEventListener('click', leaveGame);
+  leaveSpectatorBtn.addEventListener('click', handleLeaveSpectator);
   logoutBtn.addEventListener('click', handleLogout);
   canvas.addEventListener('click', handleCanvasClick);
 }
@@ -243,44 +288,40 @@ function handleLogin() {
 
 // Handle create room
 function handleCreateRoom() {
-  const roomId = roomIdInput.value.trim();
   const boardSize = parseInt(boardSizeInput.value);
   const gameMode = document.getElementById('gameMode').value;
-
-  if (!roomId) {
-    alert('Kérlek add meg a szoba azonosítót!');
-    return;
-  }
 
   if (!isLoggedIn) {
     alert('Kérlek először jelentkezz be!');
     return;
   }
 
-  socket.emit('createRoom', { roomId, boardSize, gameMode });
-  roomIdInput.value = '';
+  socket.emit('createRoom', { boardSize, gameMode });
 }
 
 // Update rooms list
 function updateRoomsList(rooms) {
-  const waitingRooms = rooms.filter(room => room.isWaiting);
-
-  if (waitingRooms.length === 0) {
-    roomsListDiv.innerHTML = '<p class="no-rooms">Jelenleg nincsenek várakozó szobák...</p>';
+  if (rooms.length === 0) {
+    roomsListDiv.innerHTML = '<p class="no-rooms">Jelenleg nincsenek szobák...</p>';
     return;
   }
 
   roomsListDiv.innerHTML = '';
-  waitingRooms.forEach(room => {
+  rooms.forEach(room => {
     const roomDiv = document.createElement('div');
     roomDiv.className = 'room-item';
 
     const playersList = room.players.length > 0 ? room.players.join(', ') : `${room.creatorName} (Létrehozó)`;
+    const statusClass = room.status === 'waiting' ? 'waiting' : 'in-progress';
+    const statusText = room.status === 'waiting' ? 'Várakozik' : 'Játék folyamatban';
+    const actionButton = room.status === 'waiting'
+      ? `<button class="btn btn-primary" onclick="joinExistingRoom('${room.roomId}')">Csatlakozás</button>`
+      : `<button class="btn btn-secondary" onclick="watchGame('${room.roomId}')">👁️ Megnézem (${room.spectatorCount || 0} néző)</button>`;
 
     roomDiv.innerHTML = `
       <div class="room-header">
         <span class="room-id">🎮 ${room.roomId}</span>
-        <span class="room-status waiting">Várakozik</span>
+        <span class="room-status ${statusClass}">${statusText}</span>
       </div>
       <div class="room-info">
         <span>👥 ${room.playerCount}/2 játékos</span>
@@ -289,7 +330,7 @@ function updateRoomsList(rooms) {
       <div class="room-players">
         ${room.playerCount > 0 ? 'Játékosok: ' + playersList : 'Létrehozó: ' + room.creatorName}
       </div>
-      <button class="btn btn-primary" onclick="joinExistingRoom('${room.roomId}')">Csatlakozás</button>
+      ${actionButton}
     `;
     roomsListDiv.appendChild(roomDiv);
   });
@@ -339,6 +380,23 @@ function kickPlayerFromLobby(socketId) {
 function handleLogout() {
   if (confirm('Biztosan ki szeretnél lépni?')) {
     location.reload();
+  }
+}
+
+// Watch a game as spectator
+function watchGame(roomId) {
+  if (!isLoggedIn) {
+    alert('Kérlek először jelentkezz be!');
+    return;
+  }
+
+  socket.emit('watchRoom', { roomId });
+}
+
+// Handle leave spectator mode
+function handleLeaveSpectator() {
+  if (confirm('Kilépés a nézői módból?')) {
+    socket.emit('leaveSpectator');
   }
 }
 

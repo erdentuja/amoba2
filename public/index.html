@@ -105,10 +105,7 @@
 
         <div class="card">
           <h2>Új szoba létrehozása</h2>
-          <div class="form-group">
-            <label for="roomId">Szoba azonosító:</label>
-            <input type="text" id="roomId" placeholder="Szoba kód (pl: room1)" maxlength="20">
-          </div>
+          <p class="hint">🎲 A szoba kódot automatikusan generáljuk</p>
           <div class="form-group">
             <label for="boardSize">Tábla méret:</label>
             <select id="boardSize" class="board-size-select">
@@ -128,13 +125,13 @@
             </select>
           </div>
           <button id="createRoomBtn" class="btn btn-primary">Szoba létrehozása</button>
-          <p class="hint">AI módban automatikusan kezdheted a játékot!</p>
+          <p class="hint">💡 AI módban automatikusan kezdheted a játékot!</p>
         </div>
 
         <div class="card rooms-list-card">
-          <h2>Várakozó szobák</h2>
+          <h2>Szobák</h2>
           <div id="roomsList" class="rooms-list">
-            <p class="no-rooms">Jelenleg nincsenek várakozó szobák...</p>
+            <p class="no-rooms">Jelenleg nincsenek szobák...</p>
           </div>
         </div>
       </div>
@@ -168,6 +165,7 @@
         <button id="undoBtn" class="btn btn-secondary" disabled>↶ Visszavonás</button>
         <button id="resetBtn" class="btn btn-secondary">Új játék</button>
         <button id="soundToggle" class="btn btn-secondary" onclick="toggleSound()">🔊 Hang BE</button>
+        <button id="leaveSpectatorBtn" class="btn btn-warning" style="display: none;">👁️ Kilépés a nézői módból</button>
         <button id="leaveBtn" class="btn btn-danger">Kilépés</button>
       </div>
     </div>

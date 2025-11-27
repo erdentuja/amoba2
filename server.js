@@ -26,6 +26,12 @@ app.get('/', (req, res) => {
 
 // Game state management
 const rooms = new Map();
+let roomIdCounter = 1000; // Start from 1000 for nicer room IDs
+
+// Generate unique room ID
+function generateRoomId() {
+  return `SZOBA-${roomIdCounter++}`;
+}
 
 // Funny AI name generator
 function generateFunnyAIName(difficulty) {
@@ -263,6 +269,8 @@ class GameRoom {
     this.creatorName = creatorName;
     this.gameMode = gameMode;  // 'pvp', 'ai-easy', 'ai-medium', 'ai-hard'
     this.players = [];
+    this.spectators = []; // {id, name}
+    this.status = 'waiting'; // 'waiting' or 'in_progress'
     this.board = Array(boardSize).fill(null).map(() => Array(boardSize).fill(null));
     this.currentPlayer = 0; // 0 or 1
     this.gameOver = false;
@@ -295,9 +303,27 @@ class GameRoom {
         this.players.push({ id: 'AI', name: aiName, symbol: 'O', isAI: true });
       }
 
+      // Update status to in_progress when 2 players are in the room
+      if (this.players.length === 2) {
+        this.status = 'in_progress';
+      }
+
       return true;
     }
     return false;
+  }
+
+  addSpectator(spectatorId, spectatorName) {
+    // Only allow spectators if game is in progress
+    if (this.status === 'in_progress') {
+      this.spectators.push({ id: spectatorId, name: spectatorName });
+      return true;
+    }
+    return false;
+  }
+
+  removeSpectator(spectatorId) {
+    this.spectators = this.spectators.filter(s => s.id !== spectatorId);
   }
 
   // Make AI move
@@ -489,6 +515,8 @@ class GameRoom {
       board: this.board,
       boardSize: this.boardSize,
       players: this.players,
+      spectators: this.spectators,
+      status: this.status,
       currentPlayer: this.currentPlayer,
       gameOver: this.gameOver,
       winner: this.winner,
@@ -509,12 +537,14 @@ function getRoomsList() {
     roomsList.push({
       roomId: roomId,
       playerCount: room.players.length,
+      spectatorCount: room.spectators.length,
       boardSize: room.boardSize,
       players: room.players.map(p => p.name),
       creatorName: room.creatorName,
-      isWaiting: room.players.length < 2,
+      status: room.status, // 'waiting' or 'in_progress'
+      isWaiting: room.status === 'waiting',
       isFull: room.players.length === 2,
-      gameStarted: room.players.length === 2
+      gameStarted: room.status === 'in_progress'
     });
   });
   return roomsList;
@@ -611,8 +641,8 @@ io.on('connection', (socket) => {
     broadcastLobbyPlayers();
   });
 
-  // Create room (without joining)
-  socket.on('createRoom', ({ roomId, boardSize, gameMode }) => {
+  // Create room (without joining) - auto-generates room ID
+  socket.on('createRoom', ({ boardSize, gameMode }) => {
     const client = connectedClients.get(socket.id);
 
     if (!client) {
@@ -626,11 +656,8 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Check if room already exists
-    if (rooms.has(roomId)) {
-      socket.emit('error', 'Ez a szoba már létezik!');
-      return;
-    }
+    // Auto-generate unique room ID
+    const roomId = generateRoomId();
 
     const size = boardSize || 15;
     const mode = gameMode || 'pvp';
@@ -708,6 +735,74 @@ io.on('connection', (socket) => {
     } else {
       socket.emit('error', 'A szoba tele van!');
     }
+  });
+
+  // Watch a game as spectator
+  socket.on('watchRoom', ({ roomId }) => {
+    const client = connectedClients.get(socket.id);
+
+    if (!client) {
+      socket.emit('error', 'Kérlek először jelentkezz be!');
+      return;
+    }
+
+    if (!rooms.has(roomId)) {
+      socket.emit('error', 'Ez a szoba nem létezik!');
+      return;
+    }
+
+    const room = rooms.get(roomId);
+    const added = room.addSpectator(socket.id, client.name);
+
+    if (added) {
+      socket.join(roomId);
+      socket.roomId = roomId;
+      socket.isSpectator = true;
+
+      // Update connected client info
+      client.room = roomId;
+
+      socket.emit('spectatorJoined', { roomId });
+      socket.emit('gameState', room.getState());
+      io.to(roomId).emit('message', `${client.name} nézi a játékot`);
+
+      // Broadcast updated rooms list
+      broadcastRoomsList();
+
+      console.log(`${client.name} watching room ${roomId}`);
+    } else {
+      socket.emit('error', 'Nem lehet nézni ezt a játékot! (Még nem kezdődött el)');
+    }
+  });
+
+  // Leave spectator mode
+  socket.on('leaveSpectator', () => {
+    if (!socket.roomId || !socket.isSpectator) {
+      return;
+    }
+
+    const room = rooms.get(socket.roomId);
+    if (room) {
+      const client = connectedClients.get(socket.id);
+      room.removeSpectator(socket.id);
+      io.to(socket.roomId).emit('message', `${client?.name || 'Néző'} kilépett a nézői módból`);
+
+      // Broadcast updated room state to remaining users
+      io.to(socket.roomId).emit('gameState', room.getState());
+    }
+
+    socket.leave(socket.roomId);
+    const client = connectedClients.get(socket.id);
+    if (client) {
+      client.room = null;
+    }
+    socket.roomId = null;
+    socket.isSpectator = false;
+
+    socket.emit('leftSpectator');
+
+    // Broadcast updated rooms list
+    broadcastRoomsList();
   });
 
   socket.on('makeMove', ({ row, col }) => {
@@ -903,13 +998,32 @@ io.on('connection', (socket) => {
       const room = rooms.get(socket.roomId);
       if (room) {
         const player = room.players.find(p => p.id === socket.id);
-        room.removePlayer(socket.id);
+        const isPlayer = player !== undefined;
+        const isSpectator = socket.isSpectator;
 
-        if (room.players.length === 0) {
+        if (isPlayer) {
+          // If a player disconnects, delete the entire room
+          io.to(socket.roomId).emit('message', `${player.name} kilépett - Szoba bezárva`);
+          io.to(socket.roomId).emit('roomClosed', { message: 'Játékos kilépett, szoba bezárva' });
+
+          // Kick all spectators back to lobby
+          room.spectators.forEach(spectator => {
+            const spectatorSocket = io.sockets.sockets.get(spectator.id);
+            if (spectatorSocket) {
+              spectatorSocket.leave(socket.roomId);
+              spectatorSocket.roomId = null;
+              spectatorSocket.isSpectator = false;
+            }
+          });
+
           rooms.delete(socket.roomId);
-        } else {
-          io.to(socket.roomId).emit('message', `${player?.name || 'Játékos'} kilépett a játékból`);
+          console.log(`Room ${socket.roomId} deleted because player ${player.name} disconnected`);
+        } else if (isSpectator) {
+          // If a spectator disconnects, just remove them
+          room.removeSpectator(socket.id);
+          io.to(socket.roomId).emit('message', `${client?.name || 'Néző'} kilépett a nézői módból`);
           io.to(socket.roomId).emit('gameState', room.getState());
+          console.log(`Spectator ${client?.name} left room ${socket.roomId}`);
         }
 
         // Broadcast updated rooms list
