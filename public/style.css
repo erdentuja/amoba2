@@ -214,6 +214,19 @@ header h1 {
   margin-bottom: 20px;
 }
 
+.room-id-display {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #667eea;
+  padding: 10px;
+  margin-bottom: 15px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+}
+
 .players-info {
   display: flex;
   justify-content: space-around;

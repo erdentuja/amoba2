@@ -28,12 +28,14 @@ const player1Info = document.getElementById('player1Info');
 const player2Info = document.getElementById('player2Info');
 const timerDiv = document.getElementById('timer');
 const timerDisplay = document.getElementById('timerDisplay');
+const roomIdDisplay = document.getElementById('roomIdDisplay');
 
 // Game state
 let socket = null;
 let gameState = null;
 let myPlayerId = null;
 let myPlayerName = null;
+let currentRoomId = null;
 let isLoggedIn = false;
 let isAdmin = false;
 let isSpectator = false;
@@ -203,11 +205,52 @@ function initSocketConnection() {
       alert(error);
     });
 
+    // Handle game state updates (for both players and spectators)
+    socket.on('gameState', (state) => {
+      const wasGameOver = gameState && gameState.gameOver;
+      const playersChanged = !gameState || gameState.players.length !== state.players.length;
+
+      gameState = state;
+
+      // Update board size from server
+      if (state.boardSize) {
+        BOARD_SIZE = state.boardSize;
+        CANVAS_SIZE = BOARD_SIZE * CELL_SIZE;
+        canvas.width = CANVAS_SIZE;
+        canvas.height = CANVAS_SIZE;
+      }
+
+      // Play sounds (only if not spectator or game just ended)
+      if (!isSpectator) {
+        if (state.gameOver && !wasGameOver) {
+          sounds.win();
+        } else if (playersChanged && state.players.length === 2) {
+          sounds.gameStart();
+        } else if (state.board && !wasGameOver) {
+          sounds.click();
+        }
+      }
+
+      updateGameDisplay();
+    });
+
+    // Handle messages
+    socket.on('message', (msg) => {
+      showMessage(msg);
+    });
+
     // Handle spectator joined
     socket.on('spectatorJoined', ({ roomId }) => {
       isSpectator = true;
+      currentRoomId = roomId;
       lobby.style.display = 'none';
       gameArea.style.display = 'flex';
+
+      // Show room ID for spectators
+      if (roomIdDisplay) {
+        roomIdDisplay.textContent = `📺 Szoba: ${roomId}`;
+        roomIdDisplay.style.display = 'block';
+      }
 
       // Show leave spectator button, hide game controls for spectators
       leaveSpectatorBtn.style.display = 'inline-block';
@@ -215,14 +258,20 @@ function initSocketConnection() {
       resetBtn.style.display = 'none';
       leaveBtn.style.display = 'none';
 
-      showMessage(`Nézői módban vagy a ${roomId} szobában`);
+      showMessage(`🎬 Nézői mód aktív`);
     });
 
     // Handle left spectator mode
     socket.on('leftSpectator', () => {
       isSpectator = false;
+      currentRoomId = null;
       gameArea.style.display = 'none';
       lobby.style.display = 'flex';
+
+      // Hide room ID display
+      if (roomIdDisplay) {
+        roomIdDisplay.style.display = 'none';
+      }
 
       // Reset button visibility
       leaveSpectatorBtn.style.display = 'none';
@@ -231,14 +280,21 @@ function initSocketConnection() {
       leaveBtn.style.display = 'inline-block';
 
       gameState = null;
+      stopTimer();
     });
 
     // Handle room closed
     socket.on('roomClosed', ({ message }) => {
       alert(message || 'A szoba bezárva');
       isSpectator = false;
+      currentRoomId = null;
       gameArea.style.display = 'none';
       lobby.style.display = 'flex';
+
+      // Hide room ID display
+      if (roomIdDisplay) {
+        roomIdDisplay.style.display = 'none';
+      }
 
       // Reset button visibility
       leaveSpectatorBtn.style.display = 'none';
@@ -247,6 +303,7 @@ function initSocketConnection() {
       leaveBtn.style.display = 'inline-block';
 
       gameState = null;
+      stopTimer();
     });
 
     setupAdminListeners();
@@ -409,40 +466,6 @@ function joinExistingRoom(roomId) {
 
   socket.emit('joinRoom', { roomId });
 
-  // Setup game state listener
-  socket.on('gameState', (state) => {
-    const wasGameOver = gameState && gameState.gameOver;
-    const playersChanged = !gameState || gameState.players.length !== state.players.length;
-
-    gameState = state;
-
-    // Update board size from server
-    if (state.boardSize) {
-      BOARD_SIZE = state.boardSize;
-      CANVAS_SIZE = BOARD_SIZE * CELL_SIZE;
-      canvas.width = CANVAS_SIZE;
-      canvas.height = CANVAS_SIZE;
-    }
-
-    // Play sounds
-    if (state.gameOver && !wasGameOver) {
-      // Game just ended
-      sounds.win();
-    } else if (playersChanged && state.players.length === 2) {
-      // Game started (2 players joined)
-      sounds.gameStart();
-    } else if (state.board && !wasGameOver) {
-      // Regular move
-      sounds.click();
-    }
-
-    updateGameDisplay();
-  });
-
-  socket.on('message', (msg) => {
-    showMessage(msg);
-  });
-
   // Show game area
   lobby.style.display = 'none';
   gameArea.style.display = 'block';
@@ -558,8 +581,10 @@ function updateGameDisplay() {
       // Start winning animation
       startWinningAnimation();
 
-      // Show victory modal
-      showVictoryModal(gameState.winner);
+      // Show victory modal (only for players, not spectators)
+      if (!isSpectator) {
+        showVictoryModal(gameState.winner);
+      }
     } else {
       currentTurnDiv.textContent = '🤝 Döntetlen!';
       currentTurnDiv.style.color = '#FF9800';
@@ -569,11 +594,18 @@ function updateGameDisplay() {
     stopWinningAnimation();
 
     if (gameState.players.length < 2) {
-      currentTurnDiv.textContent = 'Várakozás másik játékosra...';
-      currentTurnDiv.style.color = '#999';
+      // Don't show waiting message in spectator mode
+      if (!isSpectator) {
+        currentTurnDiv.textContent = 'Várakozás másik játékosra...';
+        currentTurnDiv.style.color = '#999';
+      } else {
+        currentTurnDiv.textContent = 'Játék hamarosan kezdődik...';
+        currentTurnDiv.style.color = '#999';
+      }
     } else {
       const currentPlayer = gameState.players[gameState.currentPlayer];
-      currentTurnDiv.textContent = `${currentPlayer.name} következik (${currentPlayer.symbol})`;
+      const prefix = isSpectator ? '👁️ ' : '';
+      currentTurnDiv.textContent = `${prefix}${currentPlayer.name} következik (${currentPlayer.symbol})`;
       currentTurnDiv.style.color = '#667eea';
     }
   }
