@@ -368,6 +368,7 @@ function setupEventListeners() {
   leaveSpectatorBtn.addEventListener('click', handleLeaveSpectator);
   logoutBtn.addEventListener('click', handleLogout);
   canvas.addEventListener('click', handleCanvasClick);
+  canvas.addEventListener('touchstart', handleCanvasClick);
 
   // Victory modal controls
   if (victoryNewGameBtn) victoryNewGameBtn.addEventListener('click', requestNewGame);
@@ -589,12 +590,41 @@ function updateTimerDisplay(seconds) {
 function handleCanvasClick(e) {
   if (!gameState || gameState.gameOver) return;
 
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+  // Prevent default to avoid issues on mobile
+  e.preventDefault();
 
-  const col = Math.floor(x / CELL_SIZE);
-  const row = Math.floor(y / CELL_SIZE);
+  const rect = canvas.getBoundingClientRect();
+
+  // Handle both mouse and touch events
+  let clientX, clientY;
+  if (e.type === 'touchstart' || e.type === 'touchend') {
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else {
+      return;
+    }
+  } else {
+    clientX = e.clientX;
+    clientY = e.clientY;
+  }
+
+  // Calculate position relative to canvas
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+
+  // Account for canvas scaling (CSS size vs actual canvas size)
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const scaledX = x * scaleX;
+  const scaledY = y * scaleY;
+
+  const col = Math.floor(scaledX / CELL_SIZE);
+  const row = Math.floor(scaledY / CELL_SIZE);
 
   if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
     // Resume audio context if suspended (browser autoplay policy)

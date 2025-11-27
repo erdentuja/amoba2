@@ -615,13 +615,16 @@ header h1 {
   }
 
   .board-container {
-    padding: 10px;
+    padding: 5px;
     margin: 10px 0;
+    width: 100%;
   }
 
   #gameBoard {
-    max-width: 100%;
-    height: auto;
+    width: 100% !important;
+    height: auto !important;
+    max-width: none;
+    touch-action: none; /* Prevent default touch behaviors */
   }
 
   .players-info {
