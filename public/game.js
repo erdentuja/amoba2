@@ -37,6 +37,9 @@ const declineNewGameBtn = document.getElementById('declineNewGameBtn');
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSendBtn');
+const lobbyChatMessages = document.getElementById('lobbyChatMessages');
+const lobbyChatInput = document.getElementById('lobbyChatInput');
+const lobbyChatSendBtn = document.getElementById('lobbyChatSendBtn');
 
 // Game state
 let socket = null;
@@ -250,6 +253,11 @@ function initSocketConnection() {
     // Handle chat messages
     socket.on('chatMessage', (data) => {
       addChatMessage(data);
+    });
+
+    // Handle lobby chat messages
+    socket.on('lobbyChatMessage', (data) => {
+      addLobbyChatMessage(data);
     });
 
     // Handle spectator joined
@@ -1102,7 +1110,7 @@ function clearConfetti() {
 function sendChatMessage() {
   const message = chatInput.value.trim();
 
-  if (!message || !socket || !socket.roomId) return;
+  if (!message || !socket) return;
 
   socket.emit('chatMessage', { message });
   chatInput.value = '';
@@ -1148,6 +1156,52 @@ if (chatInput) {
   chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       sendChatMessage();
+    }
+  });
+}
+
+// Lobby chat functions
+function sendLobbyChatMessage() {
+  const message = lobbyChatInput.value.trim();
+
+  if (!message || !socket) return;
+
+  socket.emit('lobbyChatMessage', { message });
+  lobbyChatInput.value = '';
+}
+
+function addLobbyChatMessage(data) {
+  const messageDiv = document.createElement('div');
+  const isOwnMessage = data.senderId === socket.id;
+  const isBotMessage = data.senderId === 'bot';
+
+  messageDiv.className = `chat-message ${isBotMessage ? 'bot' : isOwnMessage ? 'own' : 'other'}`;
+
+  const headerDiv = document.createElement('div');
+  headerDiv.className = 'chat-message-header';
+  headerDiv.textContent = data.senderName;
+  messageDiv.appendChild(headerDiv);
+
+  const bubbleDiv = document.createElement('div');
+  bubbleDiv.className = 'chat-message-bubble';
+  bubbleDiv.textContent = data.message;
+  messageDiv.appendChild(bubbleDiv);
+
+  lobbyChatMessages.appendChild(messageDiv);
+
+  // Auto-scroll to bottom
+  lobbyChatMessages.scrollTop = lobbyChatMessages.scrollHeight;
+}
+
+// Lobby chat event listeners
+if (lobbyChatSendBtn) {
+  lobbyChatSendBtn.addEventListener('click', sendLobbyChatMessage);
+}
+
+if (lobbyChatInput) {
+  lobbyChatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      sendLobbyChatMessage();
     }
   });
 }
