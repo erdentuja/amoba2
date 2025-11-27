@@ -13,6 +13,11 @@ let globalTimerSettings = {
   duration: 60 // seconds
 };
 
+// Global AI settings (admin configurable)
+let globalAISettings = {
+  aiVsAiEnabled: false // AI vs AI mode toggle
+};
+
 // Track connected clients
 const connectedClients = new Map(); // socketId -> {name, isAdmin, connectedAt, createdRoom}
 const loggedInPlayers = new Map(); // socketId -> {name, loggedInAt}
@@ -287,19 +292,19 @@ class GameRoom {
         // AI vs AI mode: create two AI players immediately
         this.isAIVsAI = true;
         this.isAIGame = false;
-        this.ai = new GomokuAI('medium'); // Default AI for both
+        this.ai = new GomokuAI('easy'); // Use easy AI for speed in AI vs AI
         this.status = 'in_progress'; // Start immediately
 
         // Add two AI players
         this.players.push({
           id: 'AI1',
-          name: `${generateFunnyAIName('medium')} #1`,
+          name: `${generateFunnyAIName('easy')} #1`,
           symbol: 'X',
           isAI: true
         });
         this.players.push({
           id: 'AI2',
-          name: `${generateFunnyAIName('hard')} #2`,
+          name: `${generateFunnyAIName('easy')} #2`,
           symbol: 'O',
           isAI: true
         });
@@ -737,6 +742,12 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Check if AI vs AI mode is allowed (admin must enable it)
+    if (gameMode === 'ai-vs-ai' && !globalAISettings.aiVsAiEnabled) {
+      socket.emit('error', 'AI vs AI mód jelenleg nem elérhető. Az admin engedélyezheti az admin panelben.');
+      return;
+    }
+
     // Auto-generate unique room ID
     const roomId = generateRoomId();
 
@@ -769,6 +780,8 @@ io.on('connection', (socket) => {
         client.name = 'Admin';
         socket.emit('adminLoginSuccess', { isAdmin: true });
         socket.emit('onlinePlayers', getOnlinePlayersList());
+        socket.emit('timerSettings', globalTimerSettings);
+        socket.emit('aiSettings', globalAISettings);
         console.log('Admin logged in:', socket.id);
       }
     } else {
@@ -1164,6 +1177,27 @@ io.on('connection', (socket) => {
     });
 
     console.log('Timer settings updated:', globalTimerSettings);
+  });
+
+  socket.on('adminSetAISettings', ({ aiVsAiEnabled }) => {
+    const client = connectedClients.get(socket.id);
+    if (!client || !client.isAdmin) {
+      socket.emit('error', 'Unauthorized');
+      return;
+    }
+
+    if (typeof aiVsAiEnabled === 'boolean') {
+      globalAISettings.aiVsAiEnabled = aiVsAiEnabled;
+    }
+
+    // Broadcast to all admins
+    connectedClients.forEach((c, sid) => {
+      if (c.isAdmin) {
+        io.to(sid).emit('aiSettings', globalAISettings);
+      }
+    });
+
+    console.log('AI settings updated:', globalAISettings);
   });
 
   socket.on('disconnect', () => {

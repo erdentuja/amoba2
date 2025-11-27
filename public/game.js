@@ -843,6 +843,8 @@ const roomsCountSpan = document.getElementById('roomsCount');
 const timerEnabledCheckbox = document.getElementById('timerEnabled');
 const timerDurationInput = document.getElementById('timerDuration');
 const saveTimerBtn = document.getElementById('saveTimerBtn');
+const aiVsAiEnabledCheckbox = document.getElementById('aiVsAiEnabled');
+const saveAIBtn = document.getElementById('saveAIBtn');
 
 // Admin modal controls
 adminLoginBtn.addEventListener('click', () => {
@@ -890,6 +892,11 @@ saveTimerBtn.addEventListener('click', () => {
   }
 
   socket.emit('adminSetTimer', { enabled, duration });
+});
+
+saveAIBtn.addEventListener('click', () => {
+  const aiVsAiEnabled = aiVsAiEnabledCheckbox.checked;
+  socket.emit('adminSetAISettings', { aiVsAiEnabled });
 });
 
 // Handle admin login response
@@ -940,6 +947,12 @@ function setupAdminListeners() {
     if (timerEnabledCheckbox && timerDurationInput) {
       timerEnabledCheckbox.checked = settings.enabled;
       timerDurationInput.value = settings.duration;
+    }
+  });
+
+  socket.on('aiSettings', (settings) => {
+    if (aiVsAiEnabledCheckbox) {
+      aiVsAiEnabledCheckbox.checked = settings.aiVsAiEnabled;
     }
   });
 }
