@@ -73,7 +73,24 @@
 
     <!-- Lobby -->
     <div id="lobby" class="lobby" style="display: none;">
+      <!-- Welcome Section -->
+      <div class="welcome-section">
+        <div class="welcome-text">
+          <span class="welcome-greeting">👋 Üdvözöljük, </span>
+          <span id="welcomePlayerName" class="welcome-name"></span>
+        </div>
+        <button id="logoutBtn" class="btn btn-danger">Kilépés</button>
+      </div>
+
       <div class="lobby-container">
+        <!-- Online Players List -->
+        <div class="card online-players-card">
+          <h2>Online játékosok (<span id="lobbyOnlineCount">0</span>)</h2>
+          <div id="lobbyOnlinePlayersList" class="lobby-online-list">
+            <p class="no-players">Nincsenek online játékosok...</p>
+          </div>
+        </div>
+
         <div class="card">
           <h2>Új szoba létrehozása</h2>
           <div class="form-group">

@@ -267,12 +267,40 @@ function broadcastOnlinePlayers() {
   });
 }
 
+// Broadcast online players list to all users (for lobby)
+function broadcastLobbyPlayers() {
+  const playersList = [];
+  connectedClients.forEach((client, socketId) => {
+    if (!client.isAdmin) {
+      playersList.push({
+        socketId: socketId,
+        name: client.name,
+        room: client.room || null
+      });
+    }
+  });
+  io.emit('lobbyPlayers', playersList);
+}
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // Send current rooms list to newly connected client
+  // Send current rooms list and online players to newly connected client
   socket.emit('roomsList', getRoomsList());
+  socket.emit('lobbyPlayers', (function() {
+    const playersList = [];
+    connectedClients.forEach((client, socketId) => {
+      if (!client.isAdmin) {
+        playersList.push({
+          socketId: socketId,
+          name: client.name,
+          room: client.room || null
+        });
+      }
+    });
+    return playersList;
+  })());
 
   // Player login (just registers the player)
   socket.on('login', ({ playerName }) => {
@@ -295,8 +323,9 @@ io.on('connection', (socket) => {
     socket.emit('loginSuccess', { playerName: name });
     console.log('Player logged in:', name, socket.id);
 
-    // Broadcast updated players list to admins
+    // Broadcast updated players list to admins and lobby
     broadcastOnlinePlayers();
+    broadcastLobbyPlayers();
   });
 
   // Create room (without joining)
@@ -389,6 +418,7 @@ io.on('connection', (socket) => {
       // Broadcast updated rooms list
       broadcastRoomsList();
       broadcastOnlinePlayers();
+      broadcastLobbyPlayers();
 
       console.log(`${client.name} joined room ${roomId}`);
     } else {
@@ -588,6 +618,7 @@ io.on('connection', (socket) => {
     // Broadcast updated online players list to admins and rooms list
     broadcastOnlinePlayers();
     broadcastRoomsList();
+    broadcastLobbyPlayers();
   });
 });
 
