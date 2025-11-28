@@ -198,7 +198,12 @@ function init() {
 function initSocketConnection() {
   if (!socket) {
     socket = io();
-    myPlayerId = socket.id;
+
+    // Set myPlayerId when connected
+    socket.on('connect', () => {
+      myPlayerId = socket.id;
+      console.log('🔌 Socket connected! My ID:', myPlayerId);
+    });
 
     // Handle rooms list updates
     socket.on('roomsList', (rooms) => {
