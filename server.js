@@ -770,6 +770,15 @@ io.on('connection', (socket) => {
     socket.emit('loginSuccess', { playerName: name });
     console.log('Player logged in:', name, socket.id);
 
+    // Announce login to lobby
+    const loginMessages = [
+      `👋 ${name} belépett a lobbiba! Üdv! 🎮`,
+      `🎉 ${name} csatlakozott! Hajrá! 💪`,
+      `✨ ${name} érkezett! Sok sikert! 🍀`,
+      `🚀 ${name} itt van! Rajta! ⚡`
+    ];
+    announceLobbyEvent(loginMessages[Math.floor(Math.random() * loginMessages.length)]);
+
     // Broadcast updated players list to admins and lobby
     broadcastOnlinePlayers();
     broadcastLobbyPlayers();
@@ -809,6 +818,15 @@ io.on('connection', (socket) => {
 
     socket.emit('roomCreated', { roomId, boardSize: size, gameMode: mode });
     console.log(`Room ${roomId} created by ${client.name} (mode: ${mode})`);
+
+    // Announce room creation to lobby
+    const gameModeText = mode === 'pvp' ? 'PvP' : mode === 'ai-vs-ai' ? 'AI vs AI' : `AI ${mode.split('-')[1]}`;
+    const roomMessages = [
+      `🎮 ${client.name} létrehozott egy ${size}x${size} szobát (${gameModeText})! 🆕`,
+      `🏗️ ${client.name} új szobát nyitott: ${size}x${size} (${gameModeText})! ✨`,
+      `🎯 ${client.name} szobát készített: ${size}x${size} (${gameModeText})! 🚀`
+    ];
+    announceLobbyEvent(roomMessages[Math.floor(Math.random() * roomMessages.length)]);
 
     // Broadcast updated rooms list
     broadcastRoomsList();
@@ -878,6 +896,17 @@ io.on('connection', (socket) => {
 
       if (room.players.length === 2) {
         io.to(roomId).emit('message', 'Játék elindult! X kezd.');
+
+        // Announce game start to lobby
+        const player1 = room.players[0]?.name || 'Játékos 1';
+        const player2 = room.players[1]?.name || 'Játékos 2';
+        const gameStartMessages = [
+          `⚔️ Játék indult! ${player1} vs ${player2}! Ki fog nyerni? 🎮`,
+          `🔥 Harc kezdődött: ${player1} vs ${player2}! Hajrá! 💪`,
+          `🎯 ${player1} és ${player2} csatáznak! Izgalmas lesz! ⚡`,
+          `🏁 START! ${player1} vs ${player2}! Győzzön a jobb! 🏆`
+        ];
+        announceLobbyEvent(gameStartMessages[Math.floor(Math.random() * gameStartMessages.length)]);
 
         // Start timer for first player
         room.startTimer(() => {
@@ -1353,6 +1382,17 @@ io.on('connection', (socket) => {
 
     const client = connectedClients.get(socket.id);
 
+    // Announce disconnect to lobby (if not admin and has name)
+    if (client && !client.isAdmin && client.name) {
+      const disconnectMessages = [
+        `👋 ${client.name} kilépett... Szia! 😢`,
+        `🚪 ${client.name} távozott... Viszlát! 👋`,
+        `💨 ${client.name} elment... Gyere vissza! 🙏`,
+        `😔 ${client.name} otthagyta a lobbyt... 💔`
+      ];
+      announceLobbyEvent(disconnectMessages[Math.floor(Math.random() * disconnectMessages.length)]);
+    }
+
     // Remove from connected clients and logged in players
     connectedClients.delete(socket.id);
     loggedInPlayers.delete(socket.id);
@@ -1444,6 +1484,20 @@ function announceGameResult(winnerName, loserName, isDraw = false) {
       message = announcements[Math.floor(Math.random() * announcements.length)];
     }
 
+    announceLobbyEvent(message);
+  }
+}
+
+// Generic function to announce events to lobby
+function announceLobbyEvent(message) {
+  const lobbyPlayers = [];
+  connectedClients.forEach((client, sid) => {
+    if (!client.room && !client.isAdmin) {
+      lobbyPlayers.push(sid);
+    }
+  });
+
+  if (lobbyPlayers.length > 0) {
     lobbyPlayers.forEach(sid => {
       io.to(sid).emit('lobbyChatMessage', {
         senderId: 'bot',
