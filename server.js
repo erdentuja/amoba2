@@ -968,7 +968,6 @@ io.on('connection', (socket) => {
 
     if (player) {
       // If a player leaves, delete the entire room and kick everyone
-      io.to(socket.roomId).emit('message', `${player.name} kilépett - Szoba bezárva`);
       io.to(socket.roomId).emit('roomClosed', { message: 'Játékos kilépett, szoba bezárva' });
 
       // Clear all players and spectators
@@ -1342,7 +1341,6 @@ io.on('connection', (socket) => {
 
         if (isPlayer) {
           // If a player disconnects, delete the entire room
-          io.to(socket.roomId).emit('message', `${player.name} kilépett - Szoba bezárva`);
           io.to(socket.roomId).emit('roomClosed', { message: 'Játékos kilépett, szoba bezárva' });
 
           // Kick all spectators back to lobby

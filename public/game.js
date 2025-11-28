@@ -306,7 +306,6 @@ function initSocketConnection() {
 
     // Handle room closed
     socket.on('roomClosed', ({ message }) => {
-      alert(message || 'A szoba bezárva');
       isSpectator = false;
       currentRoomId = null;
       gameArea.style.display = 'none';
@@ -978,11 +977,6 @@ function setupAdminListeners() {
   socket.on('kicked', ({ message }) => {
     alert(message);
     location.reload();
-  });
-
-  socket.on('roomClosed', ({ message }) => {
-    alert(message);
-    leaveGame();
   });
 
   socket.on('timerSettings', (settings) => {
