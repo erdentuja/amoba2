@@ -953,24 +953,18 @@ io.on('connection', (socket) => {
 
   // Leave room (player leaving game)
   socket.on('leaveRoom', () => {
-    console.log(`LeaveRoom called by ${socket.id}, roomId: ${socket.roomId}`);
-
     if (!socket.roomId) {
-      console.log(`LeaveRoom: No roomId for ${socket.id}`);
       return;
     }
 
     const room = rooms.get(socket.roomId);
     if (!room) {
-      console.log(`LeaveRoom: Room ${socket.roomId} not found`);
       socket.roomId = null;
       return;
     }
 
     const client = connectedClients.get(socket.id);
     const player = room.players.find(p => p.id === socket.id);
-
-    console.log(`LeaveRoom: Player found: ${player ? player.name : 'NO'}, Room has ${room.players.length} players`);
 
     if (player) {
       // If a player leaves, delete the entire room and kick everyone
@@ -1006,9 +1000,6 @@ io.on('connection', (socket) => {
       });
 
       rooms.delete(socket.roomId);
-      console.log(`✓ Room ${socket.roomId} DELETED because ${player.name} left (${rooms.size} rooms remaining)`);
-    } else {
-      console.log(`WARNING: Player not found in room ${socket.roomId}, not deleting room`);
     }
 
     socket.leave(socket.roomId);
