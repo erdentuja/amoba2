@@ -878,6 +878,13 @@ io.on('connection', (socket) => {
     }
 
     const room = rooms.get(roomId);
+
+    // Prevent room creator from spectating their own room if not a player
+    if (room.creatorId === socket.id && !room.players.find(p => p.id === socket.id)) {
+      socket.emit('error', 'Nem nézheted meg a saját szobádat nézőként! Csatlakozz játékosként.');
+      return;
+    }
+
     const added = room.addSpectator(socket.id, client.name);
 
     if (added) {
@@ -1291,12 +1298,21 @@ io.on('connection', (socket) => {
     connectedClients.delete(socket.id);
     loggedInPlayers.delete(socket.id);
 
-    // If player created a room, delete it if empty
+    // If player created a room, delete it if they never joined as a player
     if (client && client.createdRoom) {
       const createdRoom = rooms.get(client.createdRoom);
-      if (createdRoom && createdRoom.players.length === 0) {
-        rooms.delete(client.createdRoom);
-        console.log(`Deleted empty room ${client.createdRoom} created by ${client.name}`);
+      if (createdRoom) {
+        // Check if the creator is actually a player in the room
+        const isPlayerInRoom = createdRoom.players.find(p => p.id === socket.id && !p.isAI);
+
+        // Delete room if creator never joined, OR if it's an AI vs AI room (creator is not a player)
+        if (!isPlayerInRoom) {
+          // Notify anyone watching (spectators or AI vs AI watchers)
+          io.to(client.createdRoom).emit('roomClosed', { message: 'A szoba létrehozója kilépett, szoba bezárva' });
+
+          rooms.delete(client.createdRoom);
+          console.log(`Deleted room ${client.createdRoom} created by ${client.name} (creator left without joining)`);
+        }
       }
     }
 
