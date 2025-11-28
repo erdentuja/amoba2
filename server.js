@@ -831,6 +831,11 @@ io.on('connection', (socket) => {
       // Update connected client info
       client.room = roomId;
 
+      // Clear createdRoom flag since player actually joined
+      if (client.createdRoom === roomId) {
+        client.createdRoom = null;
+      }
+
       io.to(roomId).emit('gameState', room.getState());
       io.to(roomId).emit('message', `${client.name} csatlakozott a játékhoz`);
 
@@ -948,13 +953,24 @@ io.on('connection', (socket) => {
 
   // Leave room (player leaving game)
   socket.on('leaveRoom', () => {
-    if (!socket.roomId) return;
+    console.log(`LeaveRoom called by ${socket.id}, roomId: ${socket.roomId}`);
+
+    if (!socket.roomId) {
+      console.log(`LeaveRoom: No roomId for ${socket.id}`);
+      return;
+    }
 
     const room = rooms.get(socket.roomId);
-    if (!room) return;
+    if (!room) {
+      console.log(`LeaveRoom: Room ${socket.roomId} not found`);
+      socket.roomId = null;
+      return;
+    }
 
     const client = connectedClients.get(socket.id);
     const player = room.players.find(p => p.id === socket.id);
+
+    console.log(`LeaveRoom: Player found: ${player ? player.name : 'NO'}, Room has ${room.players.length} players`);
 
     if (player) {
       // If a player leaves, delete the entire room and kick everyone
@@ -963,11 +979,15 @@ io.on('connection', (socket) => {
 
       // Clear all players and spectators
       room.players.forEach(p => {
-        if (p.id !== socket.id) {
+        if (p.id !== socket.id && !p.isAI) {
           const playerSocket = io.sockets.sockets.get(p.id);
           if (playerSocket) {
             playerSocket.leave(socket.roomId);
             playerSocket.roomId = null;
+            const playerClient = connectedClients.get(p.id);
+            if (playerClient) {
+              playerClient.room = null;
+            }
           }
         }
       });
@@ -978,11 +998,17 @@ io.on('connection', (socket) => {
           spectatorSocket.leave(socket.roomId);
           spectatorSocket.roomId = null;
           spectatorSocket.isSpectator = false;
+          const spectatorClient = connectedClients.get(spectator.id);
+          if (spectatorClient) {
+            spectatorClient.room = null;
+          }
         }
       });
 
       rooms.delete(socket.roomId);
-      console.log(`Room ${socket.roomId} deleted because ${player.name} left`);
+      console.log(`✓ Room ${socket.roomId} DELETED because ${player.name} left (${rooms.size} rooms remaining)`);
+    } else {
+      console.log(`WARNING: Player not found in room ${socket.roomId}, not deleting room`);
     }
 
     socket.leave(socket.roomId);
