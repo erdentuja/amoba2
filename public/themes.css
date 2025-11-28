@@ -1,0 +1,134 @@
+/* Theme System - CSS Variables */
+
+/* Light Theme (Default) */
+:root,
+[data-theme="light"] {
+  /* Background colors */
+  --bg-primary: #f5f7fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e9ecef;
+  
+  /* Text colors */
+  --text-primary: #2c3e50;
+  --text-secondary: #7f8c8d;
+  --text-inverse: #ffffff;
+  
+  /* Accent colors */
+  --accent-primary: #667eea;
+  --accent-secondary: #764ba2;
+  
+  /* Board colors */
+  --board-bg: #daa520;
+  --board-line: #8b6914;
+  --board-star: #654321;
+  
+  /* Piece colors */
+  --piece-player1: #2c3e50;
+  --piece-player2: #e74c3c;
+  --piece-shadow: rgba(0, 0, 0, 0.3);
+  
+  /* UI elements */
+  --card-bg: #ffffff;
+  --card-shadow: rgba(0, 0, 0, 0.1);
+  --border-color: #dee2e6;
+  --hover-bg: #f8f9fa;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  /* Background colors */
+  --bg-primary: #1a1d29;
+  --bg-secondary: #252936;
+  --bg-tertiary: #2d3142;
+  
+  /* Text colors */
+  --text-primary: #e9ecef;
+  --text-secondary: #adb5bd;
+  --text-inverse: #1a1d29;
+  
+  /* Accent colors */
+  --accent-primary: #667eea;
+  --accent-secondary: #764ba2;
+  
+  /* Board colors */
+  --board-bg: #3d3027;
+  --board-line: #8b6914;
+  --board-star: #d4a574;
+  
+  /* Piece colors */
+  --piece-player1: #4ecdc4;
+  --piece-player2: #ff6b6b;
+  --piece-shadow: rgba(0, 0, 0, 0.5);
+  
+  /* UI elements */
+  --card-bg: #252936;
+  --card-shadow: rgba(0, 0, 0, 0.3);
+  --border-color: #495057;
+  --hover-bg: #2d3142;
+}
+
+/* Wood Theme */
+[data-board-theme="wood"] {
+  --board-bg: #daa520;
+  --board-line: #8b6914;
+  --board-star: #654321;
+}
+
+/* Marble Theme */
+[data-board-theme="marble"] {
+  --board-bg: #f0f0f0;
+  --board-line: #999999;
+  --board-star: #666666;
+}
+
+/* Neon Theme */
+[data-board-theme="neon"] {
+  --board-bg: #0a0e27;
+  --board-line: #00ffff;
+  --board-star: #ff00ff;
+}
+
+/* Forest Theme */
+[data-board-theme="forest"] {
+  --board-bg: #2d5016;
+  --board-line: #1a2f0a;
+  --board-star: #7cb342;
+}
+
+/* Ocean Theme */
+[data-board-theme="ocean"] {
+  --board-bg: #0077be;
+  --board-line: #003d5c;
+  --board-star: #4dd0e1;
+}
+
+/* Piece Color Schemes */
+[data-piece-color="classic"] {
+  --piece-player1: #2c3e50;
+  --piece-player2: #e74c3c;
+}
+
+[data-piece-color="neon"] {
+  --piece-player1: #00ffff;
+  --piece-player2: #ff00ff;
+}
+
+[data-piece-color="pastel"] {
+  --piece-player1: #a8dadc;
+  --piece-player2: #f1c0e8;
+}
+
+[data-piece-color="vibrant"] {
+  --piece-player1: #4ecdc4;
+  --piece-player2: #ff6b6b;
+}
+
+[data-piece-color="nature"] {
+  --piece-player1: #7cb342;
+  --piece-player2: #ff9800;
+}
+
+[data-theme="dark"][data-piece-color="classic"] {
+  --piece-player1: #4ecdc4;
+  --piece-player2: #ff6b6b;
+}

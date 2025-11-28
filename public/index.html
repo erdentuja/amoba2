@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Amőba Online</title>
+  <link rel="stylesheet" href="themes.css">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -12,7 +13,11 @@
     <header>
       <h1>🎮 Amőba Online</h1>
       <p class="subtitle">5-öt egy sorba - Gomoku</p>
-      <button id="adminLoginBtn" class="admin-login-btn">🔑 Admin</button>
+      <div class="header-controls">
+        <button id="themeToggleBtn" class="theme-btn" title="Dark/Light mode">🌓</button>
+        <button id="themeSettingsBtn" class="theme-btn" title="Témák">🎨</button>
+        <button id="adminLoginBtn" class="admin-login-btn">🔑 Admin</button>
+      </div>
     </header>
 
     <!-- Admin Login Modal -->
@@ -22,6 +27,81 @@
         <h2>Admin Bejelentkezés</h2>
         <input type="password" id="adminCodeInput" placeholder="Admin kód" maxlength="50">
         <button id="adminSubmitBtn" class="btn btn-primary">Bejelentkezés</button>
+      </div>
+    </div>
+
+    <!-- Theme Settings Modal -->
+    <div id="themeModal" class="modal" style="display: none;">
+      <div class="modal-content theme-modal-content">
+        <span class="close theme-close">&times;</span>
+        <h2>🎨 Téma Beállítások</h2>
+
+        <div class="theme-section">
+          <h3>📏 Tábla Téma</h3>
+          <div class="theme-options">
+            <button class="theme-option" data-board-theme="wood">
+              <div class="theme-preview wood-preview"></div>
+              <span>🪵 Fa</span>
+            </button>
+            <button class="theme-option" data-board-theme="marble">
+              <div class="theme-preview marble-preview"></div>
+              <span>🏛️ Márvány</span>
+            </button>
+            <button class="theme-option" data-board-theme="neon">
+              <div class="theme-preview neon-preview"></div>
+              <span>💎 Neon</span>
+            </button>
+            <button class="theme-option" data-board-theme="forest">
+              <div class="theme-preview forest-preview"></div>
+              <span>🌲 Erdő</span>
+            </button>
+            <button class="theme-option" data-board-theme="ocean">
+              <div class="theme-preview ocean-preview"></div>
+              <span>🌊 Óceán</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="theme-section">
+          <h3>🎯 Bábu Színek</h3>
+          <div class="theme-options">
+            <button class="theme-option" data-piece-color="classic">
+              <div class="piece-color-preview">
+                <span class="preview-piece classic-p1"></span>
+                <span class="preview-piece classic-p2"></span>
+              </div>
+              <span>Klasszikus</span>
+            </button>
+            <button class="theme-option" data-piece-color="neon">
+              <div class="piece-color-preview">
+                <span class="preview-piece neon-p1"></span>
+                <span class="preview-piece neon-p2"></span>
+              </div>
+              <span>💫 Neon</span>
+            </button>
+            <button class="theme-option" data-piece-color="pastel">
+              <div class="piece-color-preview">
+                <span class="preview-piece pastel-p1"></span>
+                <span class="preview-piece pastel-p2"></span>
+              </div>
+              <span>🌸 Pasztel</span>
+            </button>
+            <button class="theme-option" data-piece-color="vibrant">
+              <div class="piece-color-preview">
+                <span class="preview-piece vibrant-p1"></span>
+                <span class="preview-piece vibrant-p2"></span>
+              </div>
+              <span>🔥 Élénk</span>
+            </button>
+            <button class="theme-option" data-piece-color="nature">
+              <div class="piece-color-preview">
+                <span class="preview-piece nature-p1"></span>
+                <span class="preview-piece nature-p2"></span>
+              </div>
+              <span>🍃 Természet</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 

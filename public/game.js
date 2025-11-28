@@ -1477,3 +1477,285 @@ function updateResultsChart(stats) {
     });
   }
 }
+
+// Theme System
+let currentTheme = 'light';
+let currentBoardTheme = 'wood';
+let currentPieceColor = 'classic';
+
+// Get CSS variable value
+function getCSSVariable(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+// Load theme from localStorage
+function loadTheme() {
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  const savedBoardTheme = localStorage.getItem('boardTheme') || 'wood';
+  const savedPieceColor = localStorage.getItem('pieceColor') || 'classic';
+  
+  setTheme(savedTheme);
+  setBoardTheme(savedBoardTheme);
+  setPieceColor(savedPieceColor);
+}
+
+// Set main theme (dark/light)
+function setTheme(theme) {
+  currentTheme = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('theme', theme);
+  
+  // Update theme toggle button
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  if (themeToggleBtn) {
+    themeToggleBtn.textContent = theme === 'dark' ? '☀️' : '🌓';
+  }
+  
+  // Redraw board with new theme
+  if (gameState) {
+    drawBoard();
+  }
+}
+
+// Toggle dark/light mode
+function toggleTheme() {
+  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+  setTheme(newTheme);
+}
+
+// Set board theme
+function setBoardTheme(theme) {
+  currentBoardTheme = theme;
+  document.documentElement.setAttribute('data-board-theme', theme);
+  localStorage.setItem('boardTheme', theme);
+  
+  // Update active state
+  document.querySelectorAll('[data-board-theme]').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.querySelector(`[data-board-theme="${theme}"]`);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+  }
+  
+  // Redraw board
+  if (gameState) {
+    drawBoard();
+  }
+}
+
+// Set piece color scheme
+function setPieceColor(colorScheme) {
+  currentPieceColor = colorScheme;
+  document.documentElement.setAttribute('data-piece-color', colorScheme);
+  localStorage.setItem('pieceColor', colorScheme);
+  
+  // Update active state
+  document.querySelectorAll('[data-piece-color]').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.querySelector(`[data-piece-color="${colorScheme}"]`);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+  }
+  
+  // Redraw board
+  if (gameState) {
+    drawBoard();
+  }
+}
+
+// Initialize theme system
+function initThemeSystem() {
+  // Load saved theme
+  loadTheme();
+  
+  // Theme toggle button
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', toggleTheme);
+  }
+  
+  // Theme settings modal
+  const themeSettingsBtn = document.getElementById('themeSettingsBtn');
+  const themeModal = document.getElementById('themeModal');
+  const themeClose = themeModal?.querySelector('.theme-close');
+  
+  if (themeSettingsBtn && themeModal) {
+    themeSettingsBtn.addEventListener('click', () => {
+      themeModal.style.display = 'flex';
+    });
+  }
+  
+  if (themeClose && themeModal) {
+    themeClose.addEventListener('click', () => {
+      themeModal.style.display = 'none';
+    });
+  }
+  
+  // Board theme buttons
+  document.querySelectorAll('[data-board-theme]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const theme = btn.getAttribute('data-board-theme');
+      setBoardTheme(theme);
+    });
+  });
+  
+  // Piece color buttons
+  document.querySelectorAll('[data-piece-color]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const colorScheme = btn.getAttribute('data-piece-color');
+      setPieceColor(colorScheme);
+    });
+  });
+  
+  // Close modal on outside click
+  window.addEventListener('click', (e) => {
+    if (e.target === themeModal) {
+      themeModal.style.display = 'none';
+    }
+  });
+}
+
+// Override drawBoard to use CSS variables
+const originalDrawBoard = drawBoard;
+drawBoard = function() {
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  // Get colors from CSS variables
+  const boardBg = getCSSVariable('--board-bg');
+  const boardLine = getCSSVariable('--board-line');
+  const boardStar = getCSSVariable('--board-star');
+
+  // Draw background with gradient for depth
+  const bgGradient = ctx.createLinearGradient(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  bgGradient.addColorStop(0, boardBg);
+  bgGradient.addColorStop(1, shadeColor(boardBg, -10));
+  ctx.fillStyle = bgGradient;
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  // Draw grid lines
+  ctx.strokeStyle = boardLine;
+  ctx.lineWidth = 2;
+
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    // Vertical lines
+    ctx.beginPath();
+    ctx.moveTo(i * CELL_SIZE + CELL_SIZE / 2, CELL_SIZE / 2);
+    ctx.lineTo(i * CELL_SIZE + CELL_SIZE / 2, CANVAS_SIZE - CELL_SIZE / 2);
+    ctx.stroke();
+
+    // Horizontal lines
+    ctx.beginPath();
+    ctx.moveTo(CELL_SIZE / 2, i * CELL_SIZE + CELL_SIZE / 2);
+    ctx.lineTo(CANVAS_SIZE - CELL_SIZE / 2, i * CELL_SIZE + CELL_SIZE / 2);
+    ctx.stroke();
+  }
+
+  // Draw star points
+  ctx.fillStyle = boardStar;
+  const starPositions = getStarPositions();
+  starPositions.forEach(([row, col]) => {
+    const x = col * CELL_SIZE + CELL_SIZE / 2;
+    const y = row * CELL_SIZE + CELL_SIZE / 2;
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Draw pieces
+  if (gameState && gameState.board) {
+    for (let row = 0; row < BOARD_SIZE; row++) {
+      for (let col = 0; col < BOARD_SIZE; col++) {
+        const cell = gameState.board[row][col];
+        if (cell) {
+          const isWinningPiece = gameState.winningPieces &&
+            gameState.winningPieces.some(([r, c]) => r === row && c === col);
+          const isLastMove = gameState.lastMove &&
+            gameState.lastMove.row === row && gameState.lastMove.col === col;
+          drawPiece(row, col, cell, isWinningPiece, isLastMove);
+        }
+      }
+    }
+  }
+};
+
+// Helper function to shade color
+function shadeColor(color, percent) {
+  const num = parseInt(color.replace("#",""), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = (num >> 16) + amt;
+  const G = (num >> 8 & 0x00FF) + amt;
+  const B = (num & 0x0000FF) + amt;
+  return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 +
+    (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255))
+    .toString(16).slice(1);
+}
+
+// Override drawPiece to use CSS variables
+const originalDrawPiece = drawPiece;
+drawPiece = function(row, col, symbol, isWinning = false, isLastMove = false) {
+  const x = col * CELL_SIZE + CELL_SIZE / 2;
+  const y = row * CELL_SIZE + CELL_SIZE / 2;
+  const radius = CELL_SIZE * 0.4;
+
+  // Get piece colors from CSS variables
+  const player1Color = getCSSVariable('--piece-player1');
+  const player2Color = getCSSVariable('--piece-player2');
+  const shadowColor = getCSSVariable('--piece-shadow');
+
+  const pieceColor = symbol === 'X' ? player1Color : player2Color;
+
+  // Draw shadow
+  ctx.save();
+  ctx.shadowColor = shadowColor;
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetX = 3;
+  ctx.shadowOffsetY = 3;
+
+  // Draw piece with gradient
+  const gradient = ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.3, 0, x, y, radius);
+  gradient.addColorStop(0, lightenColor(pieceColor, 30));
+  gradient.addColorStop(1, pieceColor);
+  
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // Draw winning animation
+  if (isWinning) {
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Draw last move indicator
+  if (isLastMove && !isWinning) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+};
+
+// Helper function to lighten color
+function lightenColor(color, percent) {
+  const num = parseInt(color.replace("#",""), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = Math.min(255, (num >> 16) + amt);
+  const G = Math.min(255, (num >> 8 & 0x00FF) + amt);
+  const B = Math.min(255, (num & 0x0000FF) + amt);
+  return "#" + (0x1000000 + R*0x10000 + G*0x100 + B).toString(16).slice(1);
+}
+
+// Initialize theme system when page loads
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initThemeSystem);
+} else {
+  initThemeSystem();
+}
