@@ -770,14 +770,16 @@ io.on('connection', (socket) => {
     socket.emit('loginSuccess', { playerName: name });
     console.log('Player logged in:', name, socket.id);
 
-    // Announce login to lobby
-    const loginMessages = [
-      `👋 ${name} belépett a lobbiba! Üdv! 🎮`,
-      `🎉 ${name} csatlakozott! Hajrá! 💪`,
-      `✨ ${name} érkezett! Sok sikert! 🍀`,
-      `🚀 ${name} itt van! Rajta! ⚡`
-    ];
-    announceLobbyEvent(loginMessages[Math.floor(Math.random() * loginMessages.length)]);
+    // Announce login to lobby (with slight delay to ensure client is ready)
+    setTimeout(() => {
+      const loginMessages = [
+        `👋 ${name} belépett a lobbiba! Üdv! 🎮`,
+        `🎉 ${name} csatlakozott! Hajrá! 💪`,
+        `✨ ${name} érkezett! Sok sikert! 🍀`,
+        `🚀 ${name} itt van! Rajta! ⚡`
+      ];
+      announceLobbyEvent(loginMessages[Math.floor(Math.random() * loginMessages.length)]);
+    }, 200);
 
     // Broadcast updated players list to admins and lobby
     broadcastOnlinePlayers();
@@ -1489,10 +1491,10 @@ function announceGameResult(winnerName, loserName, isDraw = false) {
 }
 
 // Generic function to announce events to lobby
-function announceLobbyEvent(message) {
+function announceLobbyEvent(message, excludeSocketId = null) {
   const lobbyPlayers = [];
   connectedClients.forEach((client, sid) => {
-    if (!client.room && !client.isAdmin) {
+    if (!client.room && !client.isAdmin && sid !== excludeSocketId) {
       lobbyPlayers.push(sid);
     }
   });
