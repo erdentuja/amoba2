@@ -18,6 +18,19 @@ let globalAISettings = {
   aiVsAiEnabled: false // AI vs AI mode toggle
 };
 
+// Game statistics tracking
+let gameStats = {
+  totalGames: 0,
+  totalGamesCompleted: 0,
+  activeGames: 0,
+  peakTimes: Array(24).fill(0), // Hourly game count
+  boardSizes: { '9': 0, '13': 0, '15': 0, '19': 0 },
+  gameModes: { 'pvp': 0, 'ai-easy': 0, 'ai-medium': 0, 'ai-hard': 0, 'ai-vs-ai': 0 },
+  aiWins: 0,
+  playerWins: 0,
+  draws: 0
+};
+
 // Balambér chatbot messages
 const balamberMessages = [
   'Sziasztok! Balambér vagyok, a ti virtuális játékmesteretek! 🎮',
@@ -672,6 +685,15 @@ function broadcastLobbyPlayers() {
   io.emit('lobbyPlayers', playersList);
 }
 
+// Broadcast game statistics to all admins
+function broadcastStatsToAdmins() {
+  connectedClients.forEach((client, sid) => {
+    if (client.isAdmin) {
+      io.to(sid).emit('gameStats', gameStats);
+    }
+  });
+}
+
 // Start AI vs AI automatic game
 function startAIvsAIGame(roomId) {
   const room = rooms.get(roomId);
@@ -708,16 +730,25 @@ function startAIvsAIGame(roomId) {
       io.to(roomId).emit('gameState', room.getState());
 
       if (result.gameOver) {
+        // Track statistics - AI vs AI game ended
+        gameStats.activeGames = Math.max(0, gameStats.activeGames - 1);
+        gameStats.totalGamesCompleted++;
+
         if (result.draw) {
+          gameStats.draws++;
           io.to(roomId).emit('message', '🤝 Döntetlen!');
           // Announce AI vs AI draw to lobby
           announceGameResult(currentPlayer.name, otherPlayer.name, true);
         } else {
+          gameStats.aiWins++; // Both players are AI
           io.to(roomId).emit('message', `🏆 ${result.winner.name} nyert!`);
           // Announce AI vs AI winner to lobby
           const loser = room.players.find(p => p.id !== result.winner.id);
           announceGameResult(result.winner.name, loser?.name || 'AI Ellenfél');
         }
+
+        // Broadcast updated stats to admins
+        broadcastStatsToAdmins();
       } else {
         // Schedule next move
         setTimeout(makeNextAIMove, 800); // 800ms delay between moves
@@ -815,6 +846,11 @@ io.on('connection', (socket) => {
     const newRoom = new GameRoom(roomId, size, socket.id, client.name, mode);
     rooms.set(roomId, newRoom);
 
+    // Track statistics
+    gameStats.totalGames++;
+    gameStats.boardSizes[size] = (gameStats.boardSizes[size] || 0) + 1;
+    gameStats.gameModes[mode] = (gameStats.gameModes[mode] || 0) + 1;
+
     // Track that this player created this room
     client.createdRoom = roomId;
 
@@ -850,6 +886,7 @@ io.on('connection', (socket) => {
         socket.emit('onlinePlayers', getOnlinePlayersList());
         socket.emit('timerSettings', globalTimerSettings);
         socket.emit('aiSettings', globalAISettings);
+        socket.emit('gameStats', gameStats);
         console.log('Admin logged in:', socket.id);
       }
     } else {
@@ -898,6 +935,11 @@ io.on('connection', (socket) => {
 
       if (room.players.length === 2) {
         io.to(roomId).emit('message', 'Játék elindult! X kezd.');
+
+        // Track statistics - game started
+        gameStats.activeGames++;
+        const currentHour = new Date().getHours();
+        gameStats.peakTimes[currentHour]++;
 
         // Announce game start to lobby
         const player1 = room.players[0]?.name || 'Játékos 1';
@@ -1085,18 +1127,33 @@ io.on('connection', (socket) => {
       io.to(socket.roomId).emit('gameState', room.getState());
 
       if (result.gameOver) {
+        // Track statistics - game ended
+        gameStats.activeGames = Math.max(0, gameStats.activeGames - 1);
+        gameStats.totalGamesCompleted++;
+
         if (result.draw) {
+          gameStats.draws++;
           io.to(socket.roomId).emit('message', "It's a draw!");
           // Announce draw to lobby
           const player1 = room.players[0]?.name || 'Játékos 1';
           const player2 = room.players[1]?.name || 'Játékos 2';
           announceGameResult(player1, player2, true);
         } else {
+          // Track AI wins vs player wins
+          if (result.winner.isAI) {
+            gameStats.aiWins++;
+          } else {
+            gameStats.playerWins++;
+          }
+
           io.to(socket.roomId).emit('message', `${result.winner.name} wins!`);
           // Announce winner to lobby
           const loser = room.players.find(p => p.id !== result.winner.id);
           announceGameResult(result.winner.name, loser?.name || 'Ellenfél');
         }
+
+        // Broadcast updated stats to admins
+        broadcastStatsToAdmins();
       } else {
         // Start timer for next player
         room.startTimer(() => {
@@ -1119,18 +1176,33 @@ io.on('connection', (socket) => {
               io.to(socket.roomId).emit('gameState', room.getState());
 
               if (aiResult.gameOver) {
+                // Track statistics - AI game ended
+                gameStats.activeGames = Math.max(0, gameStats.activeGames - 1);
+                gameStats.totalGamesCompleted++;
+
                 if (aiResult.draw) {
+                  gameStats.draws++;
                   io.to(socket.roomId).emit('message', "It's a draw!");
                   // Announce draw to lobby
                   const player1 = room.players[0]?.name || 'Játékos 1';
                   const player2 = room.players[1]?.name || 'Játékos 2';
                   announceGameResult(player1, player2, true);
                 } else {
+                  // Track AI wins vs player wins
+                  if (aiResult.winner.isAI) {
+                    gameStats.aiWins++;
+                  } else {
+                    gameStats.playerWins++;
+                  }
+
                   io.to(socket.roomId).emit('message', `${aiResult.winner.name} wins!`);
                   // Announce winner to lobby
                   const loser = room.players.find(p => p.id !== aiResult.winner.id);
                   announceGameResult(aiResult.winner.name, loser?.name || 'Ellenfél');
                 }
+
+                // Broadcast updated stats to admins
+                broadcastStatsToAdmins();
               }
             }
           }, 500);  // 500ms delay to make AI feel more natural

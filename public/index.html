@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Amőba Online</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -93,6 +94,45 @@
         <div class="admin-section">
           <h3>Aktív Szobák (<span id="roomsCount">0</span>)</h3>
           <div id="adminRoomsList" class="admin-list"></div>
+        </div>
+        <div class="admin-section">
+          <h3>📊 Játék Statisztikák</h3>
+          <div class="stats-summary">
+            <div class="stat-card">
+              <div class="stat-value" id="totalGames">0</div>
+              <div class="stat-label">Összes játék</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="activeGames">0</div>
+              <div class="stat-label">Aktív játékok</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="completedGames">0</div>
+              <div class="stat-label">Befejezett</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="aiWinRate">0%</div>
+              <div class="stat-label">AI győzelmi arány</div>
+            </div>
+          </div>
+          <div class="charts-grid">
+            <div class="chart-container">
+              <h4>⏰ Peak időpontok (24h)</h4>
+              <canvas id="peakTimesChart"></canvas>
+            </div>
+            <div class="chart-container">
+              <h4>📏 Népszerű táblaméretek</h4>
+              <canvas id="boardSizesChart"></canvas>
+            </div>
+            <div class="chart-container">
+              <h4>🎮 Játék módok</h4>
+              <canvas id="gameModesChart"></canvas>
+            </div>
+            <div class="chart-container">
+              <h4>🏆 Eredmények</h4>
+              <canvas id="resultsChart"></canvas>
+            </div>
+          </div>
         </div>
       </div>
     </div>

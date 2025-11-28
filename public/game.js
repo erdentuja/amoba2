@@ -1032,6 +1032,10 @@ function setupAdminListeners() {
       aiVsAiEnabledCheckbox.checked = settings.aiVsAiEnabled;
     }
   });
+
+  socket.on('gameStats', (stats) => {
+    updateGameStats(stats);
+  });
 }
 
 function updateOnlinePlayersList(players) {
@@ -1268,3 +1272,208 @@ if (lobbyChatInput) {
 
 // Start the game
 init();
+
+// Game Statistics Charts
+let peakTimesChart = null;
+let boardSizesChart = null;
+let gameModesChart = null;
+let resultsChart = null;
+
+function updateGameStats(stats) {
+  // Update stat cards
+  document.getElementById('totalGames').textContent = stats.totalGames || 0;
+  document.getElementById('activeGames').textContent = stats.activeGames || 0;
+  document.getElementById('completedGames').textContent = stats.totalGamesCompleted || 0;
+  
+  // Calculate AI win rate
+  const totalFinished = stats.playerWins + stats.aiWins;
+  const aiWinRate = totalFinished > 0 ? Math.round((stats.aiWins / totalFinished) * 100) : 0;
+  document.getElementById('aiWinRate').textContent = aiWinRate + '%';
+
+  // Update charts
+  updatePeakTimesChart(stats.peakTimes);
+  updateBoardSizesChart(stats.boardSizes);
+  updateGameModesChart(stats.gameModes);
+  updateResultsChart(stats);
+}
+
+function updatePeakTimesChart(peakTimes) {
+  const ctx = document.getElementById('peakTimesChart');
+  if (!ctx) return;
+
+  const hours = Array.from({length: 24}, (_, i) => `${i}:00`);
+  
+  if (peakTimesChart) {
+    peakTimesChart.data.datasets[0].data = peakTimes;
+    peakTimesChart.update();
+  } else {
+    peakTimesChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: hours,
+        datasets: [{
+          label: 'Játékok száma',
+          data: peakTimes,
+          borderColor: 'rgb(102, 126, 234)',
+          backgroundColor: 'rgba(102, 126, 234, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateBoardSizesChart(boardSizes) {
+  const ctx = document.getElementById('boardSizesChart');
+  if (!ctx) return;
+
+  const labels = Object.keys(boardSizes).map(size => `${size}x${size}`);
+  const data = Object.values(boardSizes);
+  
+  if (boardSizesChart) {
+    boardSizesChart.data.labels = labels;
+    boardSizesChart.data.datasets[0].data = data;
+    boardSizesChart.update();
+  } else {
+    boardSizesChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(255, 206, 86, 0.8)',
+            'rgba(75, 192, 192, 0.8)'
+          ],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateGameModesChart(gameModes) {
+  const ctx = document.getElementById('gameModesChart');
+  if (!ctx) return;
+
+  const modeLabels = {
+    'pvp': 'PvP',
+    'ai-easy': 'AI Easy',
+    'ai-medium': 'AI Medium',
+    'ai-hard': 'AI Hard',
+    'ai-vs-ai': 'AI vs AI'
+  };
+  
+  const labels = Object.keys(gameModes).map(mode => modeLabels[mode] || mode);
+  const data = Object.values(gameModes);
+  
+  if (gameModesChart) {
+    gameModesChart.data.labels = labels;
+    gameModesChart.data.datasets[0].data = data;
+    gameModesChart.update();
+  } else {
+    gameModesChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Játékok száma',
+          data: data,
+          backgroundColor: [
+            'rgba(102, 126, 234, 0.8)',
+            'rgba(118, 75, 162, 0.8)',
+            'rgba(237, 100, 166, 0.8)',
+            'rgba(255, 154, 158, 0.8)',
+            'rgba(250, 208, 196, 0.8)'
+          ],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateResultsChart(stats) {
+  const ctx = document.getElementById('resultsChart');
+  if (!ctx) return;
+
+  const data = [stats.playerWins || 0, stats.aiWins || 0, stats.draws || 0];
+  
+  if (resultsChart) {
+    resultsChart.data.datasets[0].data = data;
+    resultsChart.update();
+  } else {
+    resultsChart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: ['Játékos győzelem', 'AI győzelem', 'Döntetlen'],
+        datasets: [{
+          data: data,
+          backgroundColor: [
+            'rgba(75, 192, 192, 0.8)',
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(255, 206, 86, 0.8)'
+          ],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+  }
+}
