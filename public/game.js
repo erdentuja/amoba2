@@ -736,12 +736,17 @@ function updateGameDisplay() {
       // Start winning animation
       startWinningAnimation();
 
-      // Show victory or defeat modal (only for players, not spectators)
-      if (!isSpectator) {
-        // Check if current player is the winner
+      // Show victory or defeat modal (only for actual players in the game)
+      // Check if I'm actually a player in this game (not spectator, not just watching)
+      const amIPlayer = gameState.players.some(p => p.id === myPlayerId);
+
+      if (amIPlayer) {
+        // Check if I won or lost
         if (gameState.winner.id === myPlayerId) {
+          // I won - show victory modal
           showVictoryModal(gameState.winner);
         } else {
+          // I lost - show defeat modal
           showDefeatModal(gameState.winner);
         }
       }
