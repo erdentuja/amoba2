@@ -172,6 +172,17 @@ function init() {
     soundBtn.textContent = soundEnabled ? '🔊 Hang BE' : '🔇 Hang KI';
     soundBtn.classList.toggle('sound-off', !soundEnabled);
   }
+
+  // Auto-login if player name is saved
+  const savedPlayerName = localStorage.getItem('playerName');
+  if (savedPlayerName) {
+    // Wait for socket connection to be established
+    setTimeout(() => {
+      if (socket) {
+        socket.emit('login', { playerName: savedPlayerName });
+      }
+    }, 100);
+  }
 }
 
 // Initialize socket connection
@@ -196,6 +207,9 @@ function initSocketConnection() {
       isLoggedIn = true;
       loginScreen.style.display = 'none';
       lobby.style.display = 'flex';
+
+      // Save player name to localStorage for auto-login on refresh
+      localStorage.setItem('playerName', playerName);
 
       // Update welcome section
       if (welcomePlayerName) {
@@ -487,7 +501,34 @@ function kickPlayerFromLobby(socketId) {
 // Handle logout
 function handleLogout() {
   if (confirm('Biztosan ki szeretnél lépni?')) {
-    location.reload();
+    // Clear saved player name
+    localStorage.removeItem('playerName');
+
+    // Reset state
+    isLoggedIn = false;
+    myPlayerName = null;
+    myPlayerId = null;
+    gameState = null;
+    currentRoomId = null;
+    isSpectator = false;
+
+    // Disconnect socket
+    if (socket) {
+      socket.disconnect();
+      socket = null;
+    }
+
+    // Show login screen
+    loginScreen.style.display = 'flex';
+    lobby.style.display = 'none';
+    gameArea.style.display = 'none';
+    adminPanel.style.display = 'none';
+
+    // Clear input
+    loginPlayerNameInput.value = '';
+
+    // Reconnect socket for next login
+    initSocketConnection();
   }
 }
 
