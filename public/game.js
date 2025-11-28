@@ -40,6 +40,9 @@ const chatSendBtn = document.getElementById('chatSendBtn');
 const lobbyChatMessages = document.getElementById('lobbyChatMessages');
 const lobbyChatInput = document.getElementById('lobbyChatInput');
 const lobbyChatSendBtn = document.getElementById('lobbyChatSendBtn');
+const viewStatsBtn = document.getElementById('viewStatsBtn');
+const backToLobbyBtn = document.getElementById('backToLobbyBtn');
+const statsView = document.getElementById('statsView');
 
 // Game state
 let socket = null;
@@ -380,6 +383,8 @@ function setupEventListeners() {
   leaveBtn.addEventListener('click', leaveGame);
   leaveSpectatorBtn.addEventListener('click', handleLeaveSpectator);
   logoutBtn.addEventListener('click', handleLogout);
+  viewStatsBtn.addEventListener('click', showStatsView);
+  backToLobbyBtn.addEventListener('click', hideStatsView);
 
   // Canvas events for both mouse and touch
   canvas.addEventListener('click', handleCanvasClick);
@@ -530,6 +535,21 @@ function handleLogout() {
     // Reconnect socket for next login
     initSocketConnection();
   }
+}
+
+// Show statistics view
+function showStatsView() {
+  lobby.style.display = 'none';
+  statsView.style.display = 'block';
+
+  // Request stats from server
+  socket.emit('requestStats');
+}
+
+// Hide statistics view and return to lobby
+function hideStatsView() {
+  statsView.style.display = 'none';
+  lobby.style.display = 'flex';
 }
 
 // Watch a game as spectator
@@ -1035,6 +1055,7 @@ function setupAdminListeners() {
 
   socket.on('gameStats', (stats) => {
     updateGameStats(stats);
+    updateStatsView(stats);
   });
 }
 
@@ -1279,6 +1300,12 @@ let boardSizesChart = null;
 let gameModesChart = null;
 let resultsChart = null;
 
+// Stats view charts (separate instances)
+let statsPeakTimesChart = null;
+let statsBoardSizesChart = null;
+let statsGameModesChart = null;
+let statsResultsChart = null;
+
 function updateGameStats(stats) {
   // Update stat cards
   document.getElementById('totalGames').textContent = stats.totalGames || 0;
@@ -1295,6 +1322,30 @@ function updateGameStats(stats) {
   updateBoardSizesChart(stats.boardSizes);
   updateGameModesChart(stats.gameModes);
   updateResultsChart(stats);
+}
+
+// Update stats view (for public statistics page)
+function updateStatsView(stats) {
+  // Update stat cards
+  const statsTotalGames = document.getElementById('statsTotalGames');
+  const statsActiveGames = document.getElementById('statsActiveGames');
+  const statsCompletedGames = document.getElementById('statsCompletedGames');
+  const statsAiWinRate = document.getElementById('statsAiWinRate');
+
+  if (statsTotalGames) statsTotalGames.textContent = stats.totalGames || 0;
+  if (statsActiveGames) statsActiveGames.textContent = stats.activeGames || 0;
+  if (statsCompletedGames) statsCompletedGames.textContent = stats.totalGamesCompleted || 0;
+
+  // Calculate AI win rate
+  const totalFinished = stats.playerWins + stats.aiWins;
+  const aiWinRate = totalFinished > 0 ? Math.round((stats.aiWins / totalFinished) * 100) : 0;
+  if (statsAiWinRate) statsAiWinRate.textContent = aiWinRate + '%';
+
+  // Update charts
+  updateStatsPeakTimesChart(stats.peakTimes);
+  updateStatsBoardSizesChart(stats.boardSizes);
+  updateStatsGameModesChart(stats.gameModes);
+  updateStatsResultsChart(stats);
 }
 
 function updatePeakTimesChart(peakTimes) {
@@ -1451,6 +1502,184 @@ function updateResultsChart(stats) {
     resultsChart.update();
   } else {
     resultsChart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: ['Játékos győzelem', 'AI győzelem', 'Döntetlen'],
+        datasets: [{
+          data: data,
+          backgroundColor: [
+            'rgba(75, 192, 192, 0.8)',
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(255, 206, 86, 0.8)'
+          ],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+  }
+}
+
+// Stats view chart functions (duplicates for separate canvas instances)
+function updateStatsPeakTimesChart(peakTimes) {
+  const ctx = document.getElementById('statsPeakTimesChart');
+  if (!ctx) return;
+
+  const hours = Array.from({length: 24}, (_, i) => `${i}:00`);
+
+  if (statsPeakTimesChart) {
+    statsPeakTimesChart.data.datasets[0].data = peakTimes;
+    statsPeakTimesChart.update();
+  } else {
+    statsPeakTimesChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: hours,
+        datasets: [{
+          label: 'Játékok száma',
+          data: peakTimes,
+          borderColor: 'rgb(102, 126, 234)',
+          backgroundColor: 'rgba(102, 126, 234, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateStatsBoardSizesChart(boardSizes) {
+  const ctx = document.getElementById('statsBoardSizesChart');
+  if (!ctx) return;
+
+  const data = [boardSizes['9'] || 0, boardSizes['13'] || 0, boardSizes['15'] || 0, boardSizes['19'] || 0];
+
+  if (statsBoardSizesChart) {
+    statsBoardSizesChart.data.datasets[0].data = data;
+    statsBoardSizesChart.update();
+  } else {
+    statsBoardSizesChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['9x9', '13x13', '15x15', '19x19'],
+        datasets: [{
+          data: data,
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(255, 206, 86, 0.8)',
+            'rgba(75, 192, 192, 0.8)'
+          ],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateStatsGameModesChart(gameModes) {
+  const ctx = document.getElementById('statsGameModesChart');
+  if (!ctx) return;
+
+  const labels = ['PvP', 'AI Könnyű', 'AI Közepes', 'AI Nehéz', 'AI vs AI'];
+  const data = [
+    gameModes['pvp'] || 0,
+    gameModes['ai-easy'] || 0,
+    gameModes['ai-medium'] || 0,
+    gameModes['ai-hard'] || 0,
+    gameModes['ai-vs-ai'] || 0
+  ];
+
+  if (statsGameModesChart) {
+    statsGameModesChart.data.labels = labels;
+    statsGameModesChart.data.datasets[0].data = data;
+    statsGameModesChart.update();
+  } else {
+    statsGameModesChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Játékok száma',
+          data: data,
+          backgroundColor: [
+            'rgba(102, 126, 234, 0.8)',
+            'rgba(118, 75, 162, 0.8)',
+            'rgba(237, 100, 166, 0.8)',
+            'rgba(255, 154, 158, 0.8)',
+            'rgba(250, 208, 196, 0.8)'
+          ],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateStatsResultsChart(stats) {
+  const ctx = document.getElementById('statsResultsChart');
+  if (!ctx) return;
+
+  const data = [stats.playerWins || 0, stats.aiWins || 0, stats.draws || 0];
+
+  if (statsResultsChart) {
+    statsResultsChart.data.datasets[0].data = data;
+    statsResultsChart.update();
+  } else {
+    statsResultsChart = new Chart(ctx, {
       type: 'pie',
       data: {
         labels: ['Játékos győzelem', 'AI győzelem', 'Döntetlen'],

@@ -241,6 +241,7 @@
         <div class="welcome-controls">
           <button id="themeToggleBtnLobby" class="theme-btn" title="Dark/Light mode">🌓</button>
           <button id="themeSettingsBtnLobby" class="theme-btn" title="Témák">🎨</button>
+          <button id="viewStatsBtn" class="btn btn-secondary">📊 Statisztikák</button>
           <button id="logoutBtn" class="btn btn-danger">Kilépés</button>
         </div>
       </div>
@@ -294,6 +295,52 @@
           <div class="lobby-chat-input-container">
             <input type="text" id="lobbyChatInput" class="chat-input" placeholder="Írj üzenetet a lobbyban..." maxlength="200">
             <button id="lobbyChatSendBtn" class="chat-send-btn">Küldés</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics View -->
+    <div id="statsView" class="stats-view" style="display: none;">
+      <div class="stats-header">
+        <h2>📊 Játék Statisztikák</h2>
+        <button id="backToLobbyBtn" class="btn btn-primary">⬅️ Vissza a lobbyba</button>
+      </div>
+      <div class="stats-content">
+        <div class="stats-summary">
+          <div class="stat-card">
+            <div class="stat-value" id="statsTotalGames">0</div>
+            <div class="stat-label">Összes játék</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statsActiveGames">0</div>
+            <div class="stat-label">Aktív játékok</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statsCompletedGames">0</div>
+            <div class="stat-label">Befejezett</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statsAiWinRate">0%</div>
+            <div class="stat-label">AI győzelmi arány</div>
+          </div>
+        </div>
+        <div class="charts-grid">
+          <div class="chart-container">
+            <h4>⏰ Peak időpontok (24h)</h4>
+            <canvas id="statsPeakTimesChart"></canvas>
+          </div>
+          <div class="chart-container">
+            <h4>📏 Népszerű táblaméretek</h4>
+            <canvas id="statsBoardSizesChart"></canvas>
+          </div>
+          <div class="chart-container">
+            <h4>🎮 Játék módok</h4>
+            <canvas id="statsGameModesChart"></canvas>
+          </div>
+          <div class="chart-container">
+            <h4>🏆 Eredmények</h4>
+            <canvas id="statsResultsChart"></canvas>
           </div>
         </div>
       </div>

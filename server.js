@@ -1451,6 +1451,11 @@ io.on('connection', (socket) => {
     console.log('AI settings updated:', globalAISettings);
   });
 
+  // Handle stats request (for public statistics view)
+  socket.on('requestStats', () => {
+    socket.emit('gameStats', gameStats);
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
 
