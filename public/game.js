@@ -1667,32 +1667,32 @@ drawBoard = function() {
   ctx.fillStyle = bgGradient;
   ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-  // Draw grid lines
+  // Draw grid lines (at cell edges, not centers)
   ctx.strokeStyle = boardLine;
   ctx.lineWidth = 2;
 
-  for (let i = 0; i < BOARD_SIZE; i++) {
+  for (let i = 0; i <= BOARD_SIZE; i++) {
     // Vertical lines
     ctx.beginPath();
-    ctx.moveTo(i * CELL_SIZE + CELL_SIZE / 2, CELL_SIZE / 2);
-    ctx.lineTo(i * CELL_SIZE + CELL_SIZE / 2, CANVAS_SIZE - CELL_SIZE / 2);
+    ctx.moveTo(i * CELL_SIZE, 0);
+    ctx.lineTo(i * CELL_SIZE, CANVAS_SIZE);
     ctx.stroke();
 
     // Horizontal lines
     ctx.beginPath();
-    ctx.moveTo(CELL_SIZE / 2, i * CELL_SIZE + CELL_SIZE / 2);
-    ctx.lineTo(CANVAS_SIZE - CELL_SIZE / 2, i * CELL_SIZE + CELL_SIZE / 2);
+    ctx.moveTo(0, i * CELL_SIZE);
+    ctx.lineTo(CANVAS_SIZE, i * CELL_SIZE);
     ctx.stroke();
   }
 
-  // Draw star points
+  // Draw star points in cell centers
   ctx.fillStyle = boardStar;
   const starPositions = getStarPositions();
   starPositions.forEach(([row, col]) => {
     const x = col * CELL_SIZE + CELL_SIZE / 2;
     const y = row * CELL_SIZE + CELL_SIZE / 2;
     ctx.beginPath();
-    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
     ctx.fill();
   });
 

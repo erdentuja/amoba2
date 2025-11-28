@@ -301,7 +301,13 @@
 
     <div id="gameArea" class="game-area" style="display: none;">
       <div class="game-info">
-        <div id="roomIdDisplay" class="room-id-display" style="display: none;"></div>
+        <div class="game-info-header">
+          <div id="roomIdDisplay" class="room-id-display" style="display: none;"></div>
+          <div class="game-theme-controls">
+            <button id="themeToggleBtnGame" class="theme-btn" title="Dark/Light mode">🌓</button>
+            <button id="themeSettingsBtnGame" class="theme-btn" title="Témák">🎨</button>
+          </div>
+        </div>
         <div class="players-info">
           <div id="player1Info" class="player-info">
             <span class="player-symbol">X</span>
@@ -339,8 +345,6 @@
         <button id="undoBtn" class="btn btn-secondary" disabled>↶ Visszavonás</button>
         <button id="resetBtn" class="btn btn-secondary">Új játék</button>
         <button id="soundToggle" class="btn btn-secondary" onclick="toggleSound()">🔊 Hang BE</button>
-        <button id="themeToggleBtnGame" class="theme-btn btn-secondary" title="Dark/Light mode">🌓</button>
-        <button id="themeSettingsBtnGame" class="theme-btn btn-secondary" title="Témák">🎨</button>
         <button id="leaveSpectatorBtn" class="btn btn-warning" style="display: none;">👁️ Kilépés a nézői módból</button>
         <button id="leaveBtn" class="btn btn-danger">Kilépés</button>
       </div>
