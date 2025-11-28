@@ -3,9 +3,14 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const path = require('path');
+const fs = require('fs').promises;
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_CODE = process.env.ADMIN_CODE || 'admin123'; // Change this in production!
+
+// Data file paths
+const STATS_FILE = path.join(__dirname, 'data', 'stats.json');
+const CHAT_HISTORY_FILE = path.join(__dirname, 'data', 'chat-history.json');
 
 // Global timer settings (admin configurable)
 let globalTimerSettings = {
@@ -49,6 +54,9 @@ const balamberMessages = [
   'Néha csak nézem a játékokat és tanulok belőlük. Ti is így csináljátok? 👀',
   'Ki szereti a 15x15-ös táblát? Én azt mondom, minél nagyobb, annál jobb! 🎯'
 ];
+
+// Lobby chat history (last 10 messages)
+let lobbyChatHistory = [];
 
 // Track connected clients
 const connectedClients = new Map(); // socketId -> {name, isAdmin, connectedAt, createdRoom}
@@ -747,6 +755,9 @@ function startAIvsAIGame(roomId) {
           announceGameResult(result.winner.name, loser?.name || 'AI Ellenfél');
         }
 
+        // Save stats to file
+        saveStats().catch(err => console.error('Failed to save stats:', err));
+
         // Broadcast updated stats to admins
         broadcastStatsToAdmins();
       } else {
@@ -814,6 +825,13 @@ io.on('connection', (socket) => {
     socket.emit('loginSuccess', { playerName: name });
     console.log('Player logged in:', name, socket.id);
 
+    // Send lobby chat history to the newly logged-in player
+    setTimeout(() => {
+      lobbyChatHistory.forEach(msg => {
+        socket.emit('lobbyChatMessage', msg);
+      });
+    }, 100);
+
     // Announce login to lobby (with slight delay to ensure client is ready)
     setTimeout(() => {
       const loginMessages = [
@@ -863,6 +881,7 @@ io.on('connection', (socket) => {
     gameStats.totalGames++;
     gameStats.boardSizes[size] = (gameStats.boardSizes[size] || 0) + 1;
     gameStats.gameModes[mode] = (gameStats.gameModes[mode] || 0) + 1;
+    saveStats(); // Save stats after room creation
 
     // Track that this player created this room
     client.createdRoom = roomId;
@@ -953,6 +972,7 @@ io.on('connection', (socket) => {
         gameStats.activeGames++;
         const currentHour = new Date().getHours();
         gameStats.peakTimes[currentHour]++;
+        saveStats(); // Save stats after game start
 
         // Announce game start to lobby
         const player1 = room.players[0]?.name || 'Játékos 1';
@@ -1158,6 +1178,7 @@ io.on('connection', (socket) => {
           } else {
             gameStats.playerWins++;
           }
+          saveStats(); // Save stats after game end
 
           io.to(socket.roomId).emit('message', `${result.winner.name} wins!`);
           // Announce winner to lobby
@@ -1260,15 +1281,21 @@ io.on('connection', (socket) => {
     const trimmedMessage = message.trim();
     if (trimmedMessage.length === 0 || trimmedMessage.length > 200) return;
 
+    // Create message object
+    const chatMessage = {
+      senderId: socket.id,
+      senderName: client.name,
+      message: trimmedMessage,
+      timestamp: Date.now()
+    };
+
+    // Add to chat history
+    addToLobbyChatHistory(chatMessage);
+
     // Broadcast message to everyone in lobby (not in a room)
     connectedClients.forEach((c, sid) => {
       if (!c.room && !c.isAdmin) {
-        io.to(sid).emit('lobbyChatMessage', {
-          senderId: socket.id,
-          senderName: client.name,
-          message: trimmedMessage,
-          timestamp: Date.now()
-        });
+        io.to(sid).emit('lobbyChatMessage', chatMessage);
       }
     });
   });
@@ -1590,13 +1617,18 @@ function announceLobbyEvent(message, excludeSocketId = null) {
   });
 
   if (lobbyPlayers.length > 0) {
+    const chatMessage = {
+      senderId: 'bot',
+      senderName: '🤖 Balambér',
+      message: message,
+      timestamp: Date.now()
+    };
+
+    // Add to chat history
+    addToLobbyChatHistory(chatMessage);
+
     lobbyPlayers.forEach(sid => {
-      io.to(sid).emit('lobbyChatMessage', {
-        senderId: 'bot',
-        senderName: '🤖 Balambér',
-        message: message,
-        timestamp: Date.now()
-      });
+      io.to(sid).emit('lobbyChatMessage', chatMessage);
     });
 
     console.log(`Balambér announced: "${message}" to ${lobbyPlayers.length} players`);
@@ -1617,13 +1649,18 @@ function sendBalamberMessage() {
   if (lobbyPlayers.length > 0) {
     const randomMessage = balamberMessages[Math.floor(Math.random() * balamberMessages.length)];
 
+    const chatMessage = {
+      senderId: 'bot',
+      senderName: '🤖 Balambér',
+      message: randomMessage,
+      timestamp: Date.now()
+    };
+
+    // Add to chat history
+    addToLobbyChatHistory(chatMessage);
+
     lobbyPlayers.forEach(sid => {
-      io.to(sid).emit('lobbyChatMessage', {
-        senderId: 'bot',
-        senderName: '🤖 Balambér',
-        message: randomMessage,
-        timestamp: Date.now()
-      });
+      io.to(sid).emit('lobbyChatMessage', chatMessage);
     });
 
     console.log(`Balambér said: "${randomMessage}" to ${lobbyPlayers.length} players`);
@@ -1639,13 +1676,109 @@ function scheduleNextBalamberMessage() {
   }, delay);
 }
 
-http.listen(PORT, '0.0.0.0', () => {
+// === Data Persistence Functions ===
+
+// Ensure data directory exists
+async function ensureDataDirectory() {
+  const dataDir = path.join(__dirname, 'data');
+  try {
+    await fs.mkdir(dataDir, { recursive: true });
+  } catch (error) {
+    console.error('Error creating data directory:', error);
+  }
+}
+
+// Save statistics to file
+async function saveStats() {
+  try {
+    await ensureDataDirectory();
+    await fs.writeFile(STATS_FILE, JSON.stringify(gameStats, null, 2));
+    console.log('📊 Statistics saved');
+  } catch (error) {
+    console.error('Error saving statistics:', error);
+  }
+}
+
+// Load statistics from file
+async function loadStats() {
+  try {
+    const data = await fs.readFile(STATS_FILE, 'utf8');
+    const loadedStats = JSON.parse(data);
+    // Merge loaded stats with default structure (in case of new fields)
+    gameStats = { ...gameStats, ...loadedStats };
+    console.log('📊 Statistics loaded from file');
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error('Error loading statistics:', error);
+    } else {
+      console.log('📊 No previous statistics found, starting fresh');
+    }
+  }
+}
+
+// Save chat history to file
+async function saveChatHistory() {
+  try {
+    await ensureDataDirectory();
+    await fs.writeFile(CHAT_HISTORY_FILE, JSON.stringify(lobbyChatHistory, null, 2));
+    console.log('💬 Chat history saved');
+  } catch (error) {
+    console.error('Error saving chat history:', error);
+  }
+}
+
+// Load chat history from file
+async function loadChatHistory() {
+  try {
+    const data = await fs.readFile(CHAT_HISTORY_FILE, 'utf8');
+    lobbyChatHistory = JSON.parse(data);
+    console.log('💬 Chat history loaded from file');
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error('Error loading chat history:', error);
+    } else {
+      console.log('💬 No previous chat history found, starting fresh');
+    }
+  }
+}
+
+// Add message to lobby chat history (keep last 10)
+function addToLobbyChatHistory(message) {
+  lobbyChatHistory.push(message);
+  // Keep only last 10 messages
+  if (lobbyChatHistory.length > 10) {
+    lobbyChatHistory = lobbyChatHistory.slice(-10);
+  }
+  // Save to file (async, don't wait)
+  saveChatHistory().catch(err => console.error('Failed to save chat history:', err));
+}
+
+// Start server and load data
+async function startServer() {
+  // Load persisted data
+  await loadStats();
+  await loadChatHistory();
+
+  http.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Open http://localhost:${PORT} in your browser`);
 
-  // Start Balambér chatbot after 30 seconds
-  setTimeout(() => {
-    console.log('🤖 Balambér chatbot activated!');
-    scheduleNextBalamberMessage();
-  }, 30000);
-});
+    // Start Balambér chatbot after 30 seconds
+    setTimeout(() => {
+      console.log('🤖 Balambér chatbot activated!');
+      scheduleNextBalamberMessage();
+    }, 30000);
+
+    // Send lobby chat history to new players when they join
+    io.on('connection', (socket) => {
+      socket.on('requestLobbyChatHistory', () => {
+        lobbyChatHistory.forEach(msg => {
+          socket.emit('lobbyChatMessage', msg);
+        });
+      });
+    });
+  });
+}
+
+// Start the server
+startServer();
