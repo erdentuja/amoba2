@@ -738,17 +738,28 @@ function updateGameDisplay() {
 
       // Show victory or defeat modal (only for actual players in the game)
       // Check if I'm actually a player in this game (not spectator, not just watching)
+      console.log('=== GAME OVER DEBUG ===');
+      console.log('Winner:', gameState.winner);
+      console.log('My Player ID:', myPlayerId);
+      console.log('Players:', gameState.players);
+      console.log('Is Spectator:', isSpectator);
+
       const amIPlayer = gameState.players.some(p => p.id === myPlayerId);
+      console.log('Am I a player?', amIPlayer);
 
       if (amIPlayer) {
         // Check if I won or lost
         if (gameState.winner.id === myPlayerId) {
           // I won - show victory modal
+          console.log('➡️ I WON! Showing victory modal');
           showVictoryModal(gameState.winner);
         } else {
           // I lost - show defeat modal
+          console.log('➡️ I LOST! Showing defeat modal');
           showDefeatModal(gameState.winner);
         }
+      } else {
+        console.log('➡️ Not showing modal - not a player');
       }
     } else {
       currentTurnDiv.textContent = '🤝 Döntetlen!';
