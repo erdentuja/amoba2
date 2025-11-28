@@ -367,7 +367,10 @@ function setupEventListeners() {
   leaveBtn.addEventListener('click', leaveGame);
   leaveSpectatorBtn.addEventListener('click', handleLeaveSpectator);
   logoutBtn.addEventListener('click', handleLogout);
+
+  // Canvas events for both mouse and touch
   canvas.addEventListener('click', handleCanvasClick);
+  canvas.addEventListener('touchstart', handleCanvasClick, { passive: false });
 
   // Victory modal controls
   if (victoryNewGameBtn) victoryNewGameBtn.addEventListener('click', requestNewGame);
@@ -589,9 +592,28 @@ function updateTimerDisplay(seconds) {
 function handleCanvasClick(e) {
   if (!gameState || gameState.gameOver) return;
 
+  // Prevent default touch behavior
+  e.preventDefault();
+
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+
+  // Get coordinates from either touch or mouse event
+  let clientX, clientY;
+  if (e.type.startsWith('touch')) {
+    const touch = e.touches[0] || e.changedTouches[0];
+    clientX = touch.clientX;
+    clientY = touch.clientY;
+  } else {
+    clientX = e.clientX;
+    clientY = e.clientY;
+  }
+
+  // Calculate position relative to canvas, accounting for scaling
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const x = (clientX - rect.left) * scaleX;
+  const y = (clientY - rect.top) * scaleY;
 
   const col = Math.floor(x / CELL_SIZE);
   const row = Math.floor(y / CELL_SIZE);

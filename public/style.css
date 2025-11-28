@@ -285,6 +285,8 @@ header h1 {
   border: 3px solid #333;
   border-radius: 5px;
   cursor: pointer;
+  touch-action: none; /* Prevent default touch behaviors on mobile */
+  -webkit-tap-highlight-color: transparent; /* Remove tap highlight on iOS */
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
   display: block;
   max-width: 100%;
