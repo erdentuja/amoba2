@@ -83,7 +83,7 @@ class GomokuAI {
     switch(difficulty) {
       case 'easy': return 1;
       case 'medium': return 2;
-      case 'hard': return 3;
+      case 'hard': return 2;  // Reduced from 3 to 2 to prevent freezing
       default: return 2;
     }
   }
@@ -161,11 +161,12 @@ class GomokuAI {
       return [[center, center]];
     }
 
-    // Get cells near occupied ones (within 2 cells)
+    // Get cells near occupied ones - use smaller radius for better performance
+    const radius = this.difficulty === 'hard' ? 1 : 2;  // Smaller search area for hard mode
     const nearbyMoves = new Set();
     for (const [row, col] of occupied) {
-      for (let dr = -2; dr <= 2; dr++) {
-        for (let dc = -2; dc <= 2; dc++) {
+      for (let dr = -radius; dr <= radius; dr++) {
+        for (let dc = -radius; dc <= radius; dc++) {
           const r = row + dr;
           const c = col + dc;
           if (r >= 0 && r < boardSize && c >= 0 && c < boardSize && board[r][c] === null) {
@@ -179,6 +180,13 @@ class GomokuAI {
       const [r, c] = key.split(',').map(Number);
       moves.push([r, c]);
     });
+
+    // Limit number of moves to consider (for performance)
+    if (moves.length > 25) {
+      // Sort moves by importance and take top 25
+      moves.sort(() => Math.random() - 0.5);  // Simple randomization
+      return moves.slice(0, 25);
+    }
 
     return moves.length > 0 ? moves : this.getAllEmptyCells(board, boardSize);
   }
@@ -257,6 +265,14 @@ class GomokuAI {
     return null;
   }
 
+  // Evaluate immediate value of a move (for move ordering)
+  evaluateMove(board, boardSize, row, col, symbol) {
+    board[row][col] = symbol;
+    const score = this.evaluateBoard(board, boardSize, symbol, symbol === 'X' ? 'O' : 'X');
+    board[row][col] = null;
+    return score;
+  }
+
   // Get best move
   getBestMove(board, boardSize, aiSymbol, playerSymbol) {
     const moves = this.getPossibleMoves(board, boardSize);
@@ -270,7 +286,15 @@ class GomokuAI {
       return moves[Math.floor(Math.random() * moves.length)];
     }
 
-    for (const [row, col] of moves) {
+    // Sort moves by immediate value for better alpha-beta pruning
+    const scoredMoves = moves.map(move => ({
+      move,
+      score: this.evaluateMove(board, boardSize, move[0], move[1], aiSymbol)
+    }));
+    scoredMoves.sort((a, b) => b.score - a.score);
+
+    for (const { move } of scoredMoves) {
+      const [row, col] = move;
       board[row][col] = aiSymbol;
       const moveValue = this.minimax(board, boardSize, this.maxDepth, -Infinity, Infinity, false, aiSymbol, playerSymbol);
       board[row][col] = null;
