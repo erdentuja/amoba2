@@ -1504,13 +1504,20 @@ function setTheme(theme) {
   currentTheme = theme;
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('theme', theme);
-  
-  // Update theme toggle button
-  const themeToggleBtn = document.getElementById('themeToggleBtn');
-  if (themeToggleBtn) {
-    themeToggleBtn.textContent = theme === 'dark' ? '☀️' : '🌓';
-  }
-  
+
+  // Update all theme toggle buttons
+  const themeToggleBtns = [
+    document.getElementById('themeToggleBtn'),
+    document.getElementById('themeToggleBtnLobby'),
+    document.getElementById('themeToggleBtnGame')
+  ];
+  const icon = theme === 'dark' ? '☀️' : '🌓';
+  themeToggleBtns.forEach(btn => {
+    if (btn) {
+      btn.textContent = icon;
+    }
+  });
+
   // Redraw board with new theme
   if (gameState) {
     drawBoard();
@@ -1565,28 +1572,54 @@ function setPieceColor(colorScheme) {
   }
 }
 
+// Get star positions based on board size
+function getStarPositions() {
+  if (BOARD_SIZE === 9) {
+    return [[2, 2], [2, 6], [6, 2], [6, 6], [4, 4]];
+  } else if (BOARD_SIZE === 13) {
+    return [[3, 3], [3, 9], [9, 3], [9, 9], [6, 6]];
+  } else if (BOARD_SIZE === 15) {
+    return [[3, 3], [3, 11], [11, 3], [11, 11], [7, 7]];
+  } else if (BOARD_SIZE === 19) {
+    return [[3, 3], [3, 9], [3, 15], [9, 3], [9, 9], [9, 15], [15, 3], [15, 9], [15, 15]];
+  }
+  return [];
+}
+
 // Initialize theme system
 function initThemeSystem() {
   // Load saved theme
   loadTheme();
-  
-  // Theme toggle button
-  const themeToggleBtn = document.getElementById('themeToggleBtn');
-  if (themeToggleBtn) {
-    themeToggleBtn.addEventListener('click', toggleTheme);
-  }
-  
-  // Theme settings modal
-  const themeSettingsBtn = document.getElementById('themeSettingsBtn');
+
+  // Theme toggle buttons (login, lobby, game)
+  const themeToggleBtns = [
+    document.getElementById('themeToggleBtn'),
+    document.getElementById('themeToggleBtnLobby'),
+    document.getElementById('themeToggleBtnGame')
+  ];
+  themeToggleBtns.forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', toggleTheme);
+    }
+  });
+
+  // Theme settings buttons (login, lobby, game)
+  const themeSettingsBtns = [
+    document.getElementById('themeSettingsBtn'),
+    document.getElementById('themeSettingsBtnLobby'),
+    document.getElementById('themeSettingsBtnGame')
+  ];
   const themeModal = document.getElementById('themeModal');
   const themeClose = themeModal?.querySelector('.theme-close');
-  
-  if (themeSettingsBtn && themeModal) {
-    themeSettingsBtn.addEventListener('click', () => {
-      themeModal.style.display = 'flex';
-    });
-  }
-  
+
+  themeSettingsBtns.forEach(btn => {
+    if (btn && themeModal) {
+      btn.addEventListener('click', () => {
+        themeModal.style.display = 'flex';
+      });
+    }
+  });
+
   if (themeClose && themeModal) {
     themeClose.addEventListener('click', () => {
       themeModal.style.display = 'none';

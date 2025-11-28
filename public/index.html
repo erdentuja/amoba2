@@ -13,11 +13,7 @@
     <header>
       <h1>🎮 Amőba Online</h1>
       <p class="subtitle">5-öt egy sorba - Gomoku</p>
-      <div class="header-controls">
-        <button id="themeToggleBtn" class="theme-btn" title="Dark/Light mode">🌓</button>
-        <button id="themeSettingsBtn" class="theme-btn" title="Témák">🎨</button>
-        <button id="adminLoginBtn" class="admin-login-btn">🔑 Admin</button>
-      </div>
+      <button id="adminLoginBtn" class="admin-login-btn">🔑 Admin</button>
     </header>
 
     <!-- Admin Login Modal -->
@@ -219,6 +215,10 @@
 
     <!-- Login Screen -->
     <div id="loginScreen" class="login-screen">
+      <div class="theme-controls">
+        <button id="themeToggleBtn" class="theme-btn" title="Dark/Light mode">🌓</button>
+        <button id="themeSettingsBtn" class="theme-btn" title="Témák">🎨</button>
+      </div>
       <div class="login-card">
         <h2>🎮 Bejelentkezés</h2>
         <p>Add meg a neved a játékhoz</p>
@@ -238,7 +238,11 @@
           <span class="welcome-greeting">👋 Üdvözöljük, </span>
           <span id="welcomePlayerName" class="welcome-name"></span>
         </div>
-        <button id="logoutBtn" class="btn btn-danger">Kilépés</button>
+        <div class="welcome-controls">
+          <button id="themeToggleBtnLobby" class="theme-btn" title="Dark/Light mode">🌓</button>
+          <button id="themeSettingsBtnLobby" class="theme-btn" title="Témák">🎨</button>
+          <button id="logoutBtn" class="btn btn-danger">Kilépés</button>
+        </div>
       </div>
 
       <div class="lobby-container">
@@ -335,6 +339,8 @@
         <button id="undoBtn" class="btn btn-secondary" disabled>↶ Visszavonás</button>
         <button id="resetBtn" class="btn btn-secondary">Új játék</button>
         <button id="soundToggle" class="btn btn-secondary" onclick="toggleSound()">🔊 Hang BE</button>
+        <button id="themeToggleBtnGame" class="theme-btn btn-secondary" title="Dark/Light mode">🌓</button>
+        <button id="themeSettingsBtnGame" class="theme-btn btn-secondary" title="Témák">🎨</button>
         <button id="leaveSpectatorBtn" class="btn btn-warning" style="display: none;">👁️ Kilépés a nézői módból</button>
         <button id="leaveBtn" class="btn btn-danger">Kilépés</button>
       </div>
