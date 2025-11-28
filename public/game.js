@@ -518,6 +518,9 @@ function joinExistingRoom(roomId) {
 
   socket.emit('joinRoom', { roomId });
 
+  // Set current room ID
+  currentRoomId = roomId;
+
   // Show game area
   lobby.style.display = 'none';
   gameArea.style.display = 'block';
@@ -525,7 +528,7 @@ function joinExistingRoom(roomId) {
 
 function leaveGame() {
   // Notify server that player is leaving
-  if (socket && socket.roomId) {
+  if (socket && currentRoomId) {
     socket.emit('leaveRoom');
   }
 
@@ -534,7 +537,7 @@ function leaveGame() {
   gameArea.style.display = 'none';
   lobby.style.display = 'flex';
   gameState = null;
-  socket.roomId = null;
+  currentRoomId = null;
 }
 
 function undoMove() {
