@@ -1161,13 +1161,21 @@ function closeRoom(roomId) {
 
 // Victory modal functions
 function showVictoryModal(winner) {
+  console.log('🏆 showVictoryModal called with winner:', winner);
   const victoryModal = document.getElementById('victoryModal');
   const victoryWinnerName = document.getElementById('victoryWinnerName');
 
-  if (!victoryModal || !victoryWinnerName) return;
+  console.log('Victory modal element:', victoryModal);
+  console.log('Victory winner name element:', victoryWinnerName);
+
+  if (!victoryModal || !victoryWinnerName) {
+    console.error('❌ Victory modal elements not found!');
+    return;
+  }
 
   victoryWinnerName.textContent = winner.name;
   victoryModal.style.display = 'flex';
+  console.log('✅ Victory modal displayed');
 
   // Create confetti effect
   createConfetti();
@@ -1183,14 +1191,23 @@ function closeVictoryModal() {
 
 // Defeat modal functions
 function showDefeatModal(winner) {
-  if (!defeatModal) return;
+  console.log('😢 showDefeatModal called with winner:', winner);
+  console.log('Defeat modal element:', defeatModal);
+
+  if (!defeatModal) {
+    console.error('❌ Defeat modal element not found!');
+    return;
+  }
 
   const defeatWinnerName = document.getElementById('defeatWinnerName');
+  console.log('Defeat winner name element:', defeatWinnerName);
+
   if (defeatWinnerName) {
     defeatWinnerName.textContent = winner.name;
   }
 
   defeatModal.style.display = 'flex';
+  console.log('✅ Defeat modal displayed');
 }
 
 function closeDefeatModal() {
