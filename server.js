@@ -784,6 +784,19 @@ io.on('connection', (socket) => {
   socket.on('login', ({ playerName }) => {
     const name = playerName || `Player_${socket.id.substring(0, 4)}`;
 
+    // Check if name is already taken
+    let nameTaken = false;
+    connectedClients.forEach((client, socketId) => {
+      if (client.name === name && socketId !== socket.id) {
+        nameTaken = true;
+      }
+    });
+
+    if (nameTaken) {
+      socket.emit('error', `A "${name}" név már foglalt! Kérlek válassz másik nevet.`);
+      return;
+    }
+
     // Add to connected clients
     connectedClients.set(socket.id, {
       name: name,
