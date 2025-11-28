@@ -710,8 +710,13 @@ function startAIvsAIGame(roomId) {
       if (result.gameOver) {
         if (result.draw) {
           io.to(roomId).emit('message', '🤝 Döntetlen!');
+          // Announce AI vs AI draw to lobby
+          announceGameResult(currentPlayer.name, otherPlayer.name, true);
         } else {
           io.to(roomId).emit('message', `🏆 ${result.winner.name} nyert!`);
+          // Announce AI vs AI winner to lobby
+          const loser = room.players.find(p => p.id !== result.winner.id);
+          announceGameResult(result.winner.name, loser?.name || 'AI Ellenfél');
         }
       } else {
         // Schedule next move
@@ -1051,8 +1056,15 @@ io.on('connection', (socket) => {
       if (result.gameOver) {
         if (result.draw) {
           io.to(socket.roomId).emit('message', "It's a draw!");
+          // Announce draw to lobby
+          const player1 = room.players[0]?.name || 'Játékos 1';
+          const player2 = room.players[1]?.name || 'Játékos 2';
+          announceGameResult(player1, player2, true);
         } else {
           io.to(socket.roomId).emit('message', `${result.winner.name} wins!`);
+          // Announce winner to lobby
+          const loser = room.players.find(p => p.id !== result.winner.id);
+          announceGameResult(result.winner.name, loser?.name || 'Ellenfél');
         }
       } else {
         // Start timer for next player
@@ -1078,8 +1090,15 @@ io.on('connection', (socket) => {
               if (aiResult.gameOver) {
                 if (aiResult.draw) {
                   io.to(socket.roomId).emit('message', "It's a draw!");
+                  // Announce draw to lobby
+                  const player1 = room.players[0]?.name || 'Játékos 1';
+                  const player2 = room.players[1]?.name || 'Játékos 2';
+                  announceGameResult(player1, player2, true);
                 } else {
                   io.to(socket.roomId).emit('message', `${aiResult.winner.name} wins!`);
+                  // Announce winner to lobby
+                  const loser = room.players.find(p => p.id !== aiResult.winner.id);
+                  announceGameResult(aiResult.winner.name, loser?.name || 'Ellenfél');
                 }
               }
             }
@@ -1398,6 +1417,45 @@ io.on('connection', (socket) => {
     broadcastLobbyPlayers();
   });
 });
+
+// Balambér announces game result to lobby
+function announceGameResult(winnerName, loserName, isDraw = false) {
+  // Check if there are players in lobby (not in a room and not admin)
+  const lobbyPlayers = [];
+  connectedClients.forEach((client, sid) => {
+    if (!client.room && !client.isAdmin) {
+      lobbyPlayers.push(sid);
+    }
+  });
+
+  // Only send if there are players in lobby
+  if (lobbyPlayers.length > 0) {
+    let message;
+    if (isDraw) {
+      message = `⚡ Döntetlen! ${winnerName} és ${loserName} nem tudtak nyerni! 🤝`;
+    } else {
+      const announcements = [
+        `🏆 ${winnerName} legyőzte ${loserName}-t! Gratulálok! 🎉`,
+        `⚔️ ${winnerName} nyert ${loserName} ellen! Szép játék! 👏`,
+        `🎯 ${winnerName} győzött! ${loserName} legközelebb több szerencsét! 🍀`,
+        `🔥 ${winnerName} simán verte ${loserName}-t! Respect! 💪`,
+        `✨ ${winnerName} csapata nyert! ${loserName} majd legközelebb! 😊`
+      ];
+      message = announcements[Math.floor(Math.random() * announcements.length)];
+    }
+
+    lobbyPlayers.forEach(sid => {
+      io.to(sid).emit('lobbyChatMessage', {
+        senderId: 'bot',
+        senderName: '🤖 Balambér',
+        message: message,
+        timestamp: Date.now()
+      });
+    });
+
+    console.log(`Balambér announced: "${message}" to ${lobbyPlayers.length} players`);
+  }
+}
 
 // Balambér chatbot - sends random messages to lobby
 function sendBalamberMessage() {
