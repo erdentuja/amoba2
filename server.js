@@ -729,7 +729,8 @@ io.on('connection', (socket) => {
       name: name,
       isAdmin: false,
       connectedAt: new Date(),
-      createdRoom: null
+      createdRoom: null,
+      room: null
     });
 
     // Add to logged in players
