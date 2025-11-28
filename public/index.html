@@ -116,6 +116,32 @@
       </div>
     </div>
 
+    <!-- Defeat Modal -->
+    <div id="defeatModal" class="defeat-modal" style="display: none;">
+      <div class="defeat-modal-content">
+        <div class="defeat-icon">😢</div>
+        <h1 class="defeat-title">Vesztettél!</h1>
+        <p class="defeat-winner" id="defeatWinnerName"></p>
+        <p class="defeat-message">Győzött ebben a játékban.</p>
+        <p class="defeat-encouragement">Ne add fel! Próbáld újra! 💪</p>
+        <div class="defeat-buttons">
+          <button id="defeatNewGameBtn" class="btn btn-primary defeat-btn">🔄 Új játék</button>
+          <button id="defeatLeaveBtn" class="btn btn-danger defeat-btn">🚪 Kilépés</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Message Modal (for alerts/info) -->
+    <div id="messageModal" class="message-modal" style="display: none;">
+      <div class="message-modal-content">
+        <span class="message-modal-close">&times;</span>
+        <div id="messageModalIcon" class="message-modal-icon">ℹ️</div>
+        <h2 id="messageModalTitle" class="message-modal-title">Üzenet</h2>
+        <p id="messageModalText" class="message-modal-text"></p>
+        <button id="messageModalBtn" class="btn btn-primary">OK</button>
+      </div>
+    </div>
+
     <!-- New Game Request Modal -->
     <div id="newGameRequestModal" class="modal" style="display: none;">
       <div class="modal-content">

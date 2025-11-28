@@ -1529,3 +1529,245 @@ header h1 {
 [data-theme="dark"] .chart-container h4 {
   color: var(--text-primary);
 }
+
+/* Defeat Modal */
+.defeat-modal {
+  position: fixed;
+  z-index: 2000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.3s ease-in;
+}
+
+.defeat-modal-content {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+  padding: 60px 80px;
+  border-radius: 25px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  position: relative;
+  animation: slideIn 0.5s ease-out;
+  max-width: 90%;
+}
+
+.defeat-icon {
+  font-size: 120px;
+  animation: shake 0.5s ease-in-out;
+  text-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
+}
+
+.defeat-title {
+  color: white;
+  font-size: 48px;
+  margin: 20px 0;
+  text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+  font-weight: bold;
+}
+
+.defeat-winner {
+  color: #fbbf24;
+  font-size: 32px;
+  font-weight: bold;
+  margin: 15px 0;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.defeat-message {
+  color: white;
+  font-size: 20px;
+  margin: 10px 0;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.defeat-encouragement {
+  color: #fbbf24;
+  font-size: 24px;
+  margin: 20px 0 40px 0;
+  font-weight: 600;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.defeat-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.defeat-btn {
+  font-size: 20px;
+  padding: 15px 40px;
+  border-radius: 15px;
+  font-weight: 600;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.defeat-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* Message Modal */
+.message-modal {
+  position: fixed;
+  z-index: 2001;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.2s ease-in;
+}
+
+.message-modal-content {
+  background: white;
+  padding: 40px 50px;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  position: relative;
+  animation: scaleIn 0.3s ease-out;
+  max-width: 500px;
+  width: 90%;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.message-modal-close {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  font-size: 32px;
+  font-weight: bold;
+  color: #999;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.message-modal-close:hover {
+  color: #333;
+}
+
+.message-modal-icon {
+  font-size: 80px;
+  margin-bottom: 20px;
+}
+
+.message-modal-icon.error {
+  filter: drop-shadow(0 5px 10px rgba(239, 68, 68, 0.3));
+}
+
+.message-modal-icon.success {
+  filter: drop-shadow(0 5px 10px rgba(34, 197, 94, 0.3));
+}
+
+.message-modal-icon.warning {
+  filter: drop-shadow(0 5px 10px rgba(251, 191, 36, 0.3));
+}
+
+.message-modal-title {
+  color: #333;
+  font-size: 28px;
+  margin: 15px 0;
+  font-weight: 700;
+}
+
+.message-modal-text {
+  color: #555;
+  font-size: 18px;
+  margin: 20px 0 30px 0;
+  line-height: 1.6;
+}
+
+/* Dark mode for modals */
+[data-theme="dark"] .message-modal-content {
+  background: var(--card-bg);
+}
+
+[data-theme="dark"] .message-modal-title {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .message-modal-text {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .message-modal-close {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .message-modal-close:hover {
+  color: var(--text-primary);
+}
+
+/* Responsive for modals */
+@media (max-width: 768px) {
+  .defeat-modal-content {
+    padding: 40px 30px;
+  }
+
+  .defeat-icon {
+    font-size: 80px;
+  }
+
+  .defeat-title {
+    font-size: 32px;
+  }
+
+  .defeat-winner {
+    font-size: 24px;
+  }
+
+  .defeat-message,
+  .defeat-encouragement {
+    font-size: 18px;
+  }
+
+  .defeat-buttons {
+    flex-direction: column;
+  }
+
+  .defeat-btn {
+    width: 100%;
+  }
+
+  .message-modal-content {
+    padding: 30px 25px;
+  }
+
+  .message-modal-icon {
+    font-size: 60px;
+  }
+
+  .message-modal-title {
+    font-size: 22px;
+  }
+
+  .message-modal-text {
+    font-size: 16px;
+  }
+}

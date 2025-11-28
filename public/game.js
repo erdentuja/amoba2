@@ -43,6 +43,12 @@ const lobbyChatSendBtn = document.getElementById('lobbyChatSendBtn');
 const viewStatsBtn = document.getElementById('viewStatsBtn');
 const backToLobbyBtn = document.getElementById('backToLobbyBtn');
 const statsView = document.getElementById('statsView');
+const defeatModal = document.getElementById('defeatModal');
+const defeatNewGameBtn = document.getElementById('defeatNewGameBtn');
+const defeatLeaveBtn = document.getElementById('defeatLeaveBtn');
+const messageModal = document.getElementById('messageModal');
+const messageModalClose = document.querySelector('.message-modal-close');
+const messageModalBtn = document.getElementById('messageModalBtn');
 
 // Game state
 let socket = null;
@@ -230,7 +236,7 @@ function initSocketConnection() {
     // Handle errors
     socket.on('error', (error) => {
       sounds.error();
-      alert(error);
+      showModalMessage(error, 'error');
     });
 
     // Handle game state updates (for both players and spectators)
@@ -394,9 +400,22 @@ function setupEventListeners() {
   if (victoryNewGameBtn) victoryNewGameBtn.addEventListener('click', requestNewGame);
   if (victoryLeaveBtn) victoryLeaveBtn.addEventListener('click', leaveGameFromVictory);
 
+  // Defeat modal controls
+  if (defeatNewGameBtn) defeatNewGameBtn.addEventListener('click', requestNewGame);
+  if (defeatLeaveBtn) defeatLeaveBtn.addEventListener('click', leaveGameFromVictory);
+
   // New game request modal
   if (acceptNewGameBtn) acceptNewGameBtn.addEventListener('click', acceptNewGame);
   if (declineNewGameBtn) declineNewGameBtn.addEventListener('click', declineNewGame);
+
+  // Message modal controls
+  if (messageModalClose) messageModalClose.addEventListener('click', hideMessageModal);
+  if (messageModalBtn) messageModalBtn.addEventListener('click', hideMessageModal);
+  if (messageModal) {
+    messageModal.addEventListener('click', (e) => {
+      if (e.target === messageModal) hideMessageModal();
+    });
+  }
 }
 
 // Handle login
@@ -404,7 +423,7 @@ function handleLogin() {
   const playerName = loginPlayerNameInput.value.trim();
 
   if (!playerName) {
-    alert('Kérlek add meg a neved!');
+    showModalMessage('Kérlek add meg a neved!', 'warning');
     return;
   }
 
@@ -419,7 +438,7 @@ function handleCreateRoom() {
   const gameMode = document.getElementById('gameMode').value;
 
   if (!isLoggedIn) {
-    alert('Kérlek először jelentkezz be!');
+    showModalMessage('Kérlek először jelentkezz be!', 'warning');
     return;
   }
 
@@ -555,7 +574,7 @@ function hideStatsView() {
 // Watch a game as spectator
 function watchGame(roomId) {
   if (!isLoggedIn) {
-    alert('Kérlek először jelentkezz be!');
+    showModalMessage('Kérlek először jelentkezz be!', 'warning');
     return;
   }
 
@@ -572,7 +591,7 @@ function handleLeaveSpectator() {
 // Join existing room
 function joinExistingRoom(roomId) {
   if (!isLoggedIn) {
-    alert('Kérlek először jelentkezz be!');
+    showModalMessage('Kérlek először jelentkezz be!', 'warning');
     return;
   }
 
@@ -717,9 +736,14 @@ function updateGameDisplay() {
       // Start winning animation
       startWinningAnimation();
 
-      // Show victory modal (only for players, not spectators)
+      // Show victory or defeat modal (only for players, not spectators)
       if (!isSpectator) {
-        showVictoryModal(gameState.winner);
+        // Check if current player is the winner
+        if (gameState.winner.id === myPlayerId) {
+          showVictoryModal(gameState.winner);
+        } else {
+          showDefeatModal(gameState.winner);
+        }
       }
     } else {
       currentTurnDiv.textContent = '🤝 Döntetlen!';
@@ -989,7 +1013,7 @@ saveTimerBtn.addEventListener('click', () => {
   const duration = parseInt(timerDurationInput.value);
 
   if (duration < 10 || duration > 300) {
-    alert('Az időtartamnak 10 és 300 másodperc között kell lennie!');
+    showModalMessage('Az időtartamnak 10 és 300 másodperc között kell lennie!', 'warning');
     return;
   }
 
@@ -1020,7 +1044,7 @@ function setupAdminListeners() {
   });
 
   socket.on('adminLoginFailed', ({ error }) => {
-    alert(error || 'Helytelen admin kód');
+    showModalMessage(error || 'Helytelen admin kód', 'error');
     adminCodeInput.value = '';
   });
 
@@ -1036,8 +1060,10 @@ function setupAdminListeners() {
   });
 
   socket.on('kicked', ({ message }) => {
-    alert(message);
-    location.reload();
+    showModalMessage(message, 'warning');
+    setTimeout(() => {
+      location.reload();
+    }, 2000);
   });
 
   socket.on('timerSettings', (settings) => {
@@ -1139,16 +1165,76 @@ function closeVictoryModal() {
   }
 }
 
+// Defeat modal functions
+function showDefeatModal(winner) {
+  if (!defeatModal) return;
+
+  const defeatWinnerName = document.getElementById('defeatWinnerName');
+  if (defeatWinnerName) {
+    defeatWinnerName.textContent = winner.name;
+  }
+
+  defeatModal.style.display = 'flex';
+}
+
+function closeDefeatModal() {
+  if (defeatModal) {
+    defeatModal.style.display = 'none';
+  }
+}
+
+// Message modal functions (replaces alert)
+function showModalMessage(message, type = 'info') {
+  if (!messageModal) return;
+
+  const messageModalIcon = document.getElementById('messageModalIcon');
+  const messageModalTitle = document.getElementById('messageModalTitle');
+  const messageModalText = document.getElementById('messageModalText');
+
+  // Set icon based on type
+  let icon = 'ℹ️';
+  let title = 'Üzenet';
+  if (type === 'error') {
+    icon = '❌';
+    title = 'Hiba';
+    messageModalIcon.className = 'message-modal-icon error';
+  } else if (type === 'success') {
+    icon = '✅';
+    title = 'Siker';
+    messageModalIcon.className = 'message-modal-icon success';
+  } else if (type === 'warning') {
+    icon = '⚠️';
+    title = 'Figyelmeztetés';
+    messageModalIcon.className = 'message-modal-icon warning';
+  } else {
+    messageModalIcon.className = 'message-modal-icon';
+  }
+
+  messageModalIcon.textContent = icon;
+  messageModalTitle.textContent = title;
+  messageModalText.textContent = message;
+
+  messageModal.style.display = 'flex';
+}
+
+function hideMessageModal() {
+  if (messageModal) {
+    messageModal.style.display = 'none';
+  }
+}
+
 // Request new game
 function requestNewGame() {
   closeVictoryModal();
+  closeDefeatModal();
   socket.emit('requestNewGame');
   showMessage('Új játék kérés elküldve...');
 }
 
-// Leave game from victory modal
+// Leave game from victory/defeat modal
 function leaveGameFromVictory() {
   closeVictoryModal();
+  closeDefeatModal();
   leaveGame();
 }
 
