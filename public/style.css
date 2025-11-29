@@ -352,6 +352,23 @@ header h1 {
   font-family: 'Courier New', monospace;
 }
 
+.timer-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.timer-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2ecc71 0%, #f39c12 50%, #e74c3c 100%);
+  border-radius: 4px;
+  transition: width 0.1s linear, background 0.3s ease;
+  width: 100%;
+}
+
 /* Admin timer settings */
 .timer-settings {
   background: #f9f9f9;

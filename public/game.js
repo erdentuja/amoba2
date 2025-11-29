@@ -28,6 +28,7 @@ const player1Info = document.getElementById('player1Info');
 const player2Info = document.getElementById('player2Info');
 const timerDiv = document.getElementById('timer');
 const timerDisplay = document.getElementById('timerDisplay');
+const timerProgressFill = document.getElementById('timerProgressFill');
 const roomIdDisplay = document.getElementById('roomIdDisplay');
 const victoryNewGameBtn = document.getElementById('victoryNewGameBtn');
 const victoryLeaveBtn = document.getElementById('victoryLeaveBtn');
@@ -708,6 +709,15 @@ function updateTimerDisplay(seconds) {
 
   timerDiv.style.display = 'block';
   timerDisplay.textContent = `${seconds}s`;
+
+  // Calculate progress percentage
+  const totalDuration = gameState && gameState.timerDuration ? gameState.timerDuration : 60;
+  const percentage = (seconds / totalDuration) * 100;
+
+  // Update progress bar width
+  if (timerProgressFill) {
+    timerProgressFill.style.width = `${percentage}%`;
+  }
 
   // Change color based on remaining time
   if (seconds <= 10) {
