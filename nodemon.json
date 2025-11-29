@@ -1,0 +1,15 @@
+{
+  "watch": [
+    "server.js",
+    "public/"
+  ],
+  "ignore": [
+    "data/*",
+    "node_modules/*",
+    ".git"
+  ],
+  "ext": "js,json,html,css",
+  "env": {
+    "NODE_ENV": "development"
+  }
+}
