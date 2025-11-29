@@ -492,9 +492,21 @@ function updateRoomsList(rooms) {
     const playersList = room.players.length > 0 ? room.players.join(', ') : `${room.creatorName} (Létrehozó)`;
     const statusClass = room.status === 'waiting' ? 'waiting' : 'in-progress';
     const statusText = room.status === 'waiting' ? 'Várakozik' : 'Játék folyamatban';
-    const actionButton = room.status === 'waiting'
-      ? `<button class="btn btn-primary" onclick="joinExistingRoom('${room.roomId}')">Csatlakozás</button>`
-      : `<button class="btn btn-secondary" onclick="watchGame('${room.roomId}')">👁️ Megnézem (${room.spectatorCount || 0} néző)</button>`;
+
+    // Check if current user is the creator
+    const isCreator = room.creatorId === myPlayerId;
+
+    // Action buttons
+    let actionButtons = '';
+    if (room.status === 'waiting') {
+      actionButtons = `<button class="btn btn-primary" onclick="joinExistingRoom('${room.roomId}')">Csatlakozás</button>`;
+      // Add delete button only for creator
+      if (isCreator) {
+        actionButtons += ` <button class="btn btn-danger" onclick="deleteMyRoom('${room.roomId}')" style="margin-left: 10px;">🗑️ Törlés</button>`;
+      }
+    } else {
+      actionButtons = `<button class="btn btn-secondary" onclick="watchGame('${room.roomId}')">👁️ Megnézem (${room.spectatorCount || 0} néző)</button>`;
+    }
 
     roomDiv.innerHTML = `
       <div class="room-header">
@@ -508,7 +520,7 @@ function updateRoomsList(rooms) {
       <div class="room-players">
         ${room.playerCount > 0 ? 'Játékosok: ' + playersList : 'Létrehozó: ' + room.creatorName}
       </div>
-      ${actionButton}
+      ${actionButtons}
     `;
     roomsListDiv.appendChild(roomDiv);
   });
@@ -551,6 +563,13 @@ function kickPlayerFromLobby(socketId) {
   if (!isAdmin) return;
   if (confirm('Biztosan kickelni szeretnéd ezt a játékost?')) {
     socket.emit('adminKickPlayer', { targetSocketId: socketId });
+  }
+}
+
+// Delete own waiting room
+function deleteMyRoom(roomId) {
+  if (confirm('Biztosan törölni szeretnéd ezt a várakozó szobát?')) {
+    socket.emit('deleteRoom', { roomId });
   }
 }
 

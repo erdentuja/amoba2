@@ -639,6 +639,7 @@ function getRoomsList() {
       boardSize: room.boardSize,
       players: room.players.map(p => p.name),
       creatorName: room.creatorName,
+      creatorId: room.creatorId, // Add creator ID for delete button permission
       status: room.status, // 'waiting' or 'in_progress'
       isWaiting: room.status === 'waiting',
       isFull: room.players.length === 2,
@@ -1085,6 +1086,78 @@ io.on('connection', (socket) => {
 
     // Broadcast updated rooms list
     broadcastRoomsList();
+  });
+
+  // Delete own waiting room
+  socket.on('deleteRoom', ({ roomId }) => {
+    const client = connectedClients.get(socket.id);
+    if (!client) {
+      return;
+    }
+
+    const room = rooms.get(roomId);
+    if (!room) {
+      socket.emit('error', 'A szoba nem található');
+      return;
+    }
+
+    // Check if the user is the creator
+    if (client.createdRoom !== roomId) {
+      socket.emit('error', 'Csak a saját várakozó szobádat törölheted!');
+      return;
+    }
+
+    // Check if room is waiting (not started)
+    if (room.players.length > 1 || room.gameStarted) {
+      socket.emit('error', 'Nem törölhetsz már elindult játékot!');
+      return;
+    }
+
+    // Notify anyone in the room
+    io.to(roomId).emit('roomClosed', { message: 'A létrehozó törölte a szobát' });
+
+    // Clear players and spectators from the room
+    room.players.forEach(p => {
+      if (!p.isAI) {
+        const playerSocket = io.sockets.sockets.get(p.id);
+        if (playerSocket) {
+          playerSocket.leave(roomId);
+          playerSocket.roomId = null;
+          const playerClient = connectedClients.get(p.id);
+          if (playerClient) {
+            playerClient.room = null;
+          }
+        }
+      }
+    });
+
+    room.spectators.forEach(spectator => {
+      const spectatorSocket = io.sockets.sockets.get(spectator.id);
+      if (spectatorSocket) {
+        spectatorSocket.leave(roomId);
+        spectatorSocket.roomId = null;
+        spectatorSocket.isSpectator = false;
+        const spectatorClient = connectedClients.get(spectator.id);
+        if (spectatorClient) {
+          spectatorClient.room = null;
+        }
+      }
+    });
+
+    // Clear creator's room reference
+    client.createdRoom = null;
+    client.room = null;
+    socket.leave(roomId);
+    socket.roomId = null;
+
+    // Delete the room
+    rooms.delete(roomId);
+    console.log(`Room deleted by creator: ${roomId}`);
+
+    // Broadcast updated rooms list
+    broadcastRoomsList();
+
+    socket.emit('message', 'Várakozó szoba törölve');
   });
 
   // Leave room (player leaving game)
