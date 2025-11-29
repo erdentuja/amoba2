@@ -1045,7 +1045,7 @@ const onlineCountSpan = document.getElementById('onlineCount');
 const roomsCountSpan = document.getElementById('roomsCount');
 const timerEnabledCheckbox = document.getElementById('timerEnabled');
 const timerDurationInput = document.getElementById('timerDuration');
-const saveTimerBtn = document.getElementById('saveTimerBtn');
+const timerStatusText = document.getElementById('timerStatusText');
 const aiVsAiEnabledCheckbox = document.getElementById('aiVsAiEnabled');
 const saveAIBtn = document.getElementById('saveAIBtn');
 const clearStatsBtn = document.getElementById('clearStatsBtn');
@@ -1086,14 +1086,24 @@ adminLogoutBtn.addEventListener('click', () => {
   location.reload();
 });
 
-saveTimerBtn.addEventListener('click', () => {
+// Auto-save timer settings when toggle changes
+timerEnabledCheckbox.addEventListener('change', () => {
   const enabled = timerEnabledCheckbox.checked;
   const duration = parseInt(timerDurationInput.value);
 
-  if (duration < 10 || duration > 300) {
-    showModalMessage('Az időtartamnak 10 és 300 másodperc között kell lennie!', 'warning');
-    return;
+  // Update status text
+  if (timerStatusText) {
+    timerStatusText.textContent = enabled ? 'Be' : 'Ki';
+    timerStatusText.style.color = enabled ? '#2ecc71' : '#999';
   }
+
+  socket.emit('adminSetTimer', { enabled, duration });
+});
+
+// Auto-save timer settings when duration changes
+timerDurationInput.addEventListener('change', () => {
+  const enabled = timerEnabledCheckbox.checked;
+  const duration = parseInt(timerDurationInput.value);
 
   socket.emit('adminSetTimer', { enabled, duration });
 });
@@ -1154,6 +1164,12 @@ function setupAdminListeners() {
     if (timerEnabledCheckbox && timerDurationInput) {
       timerEnabledCheckbox.checked = settings.enabled;
       timerDurationInput.value = settings.duration;
+
+      // Update status text
+      if (timerStatusText) {
+        timerStatusText.textContent = settings.enabled ? 'Be' : 'Ki';
+        timerStatusText.style.color = settings.enabled ? '#2ecc71' : '#999';
+      }
     }
   });
 
