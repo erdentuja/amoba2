@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Amőba Online</title>
+  <link rel="stylesheet" href="themes.css">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -24,6 +26,81 @@
       </div>
     </div>
 
+    <!-- Theme Settings Modal -->
+    <div id="themeModal" class="modal" style="display: none;">
+      <div class="modal-content theme-modal-content">
+        <span class="close theme-close">&times;</span>
+        <h2>🎨 Téma Beállítások</h2>
+
+        <div class="theme-section">
+          <h3>📏 Tábla Téma</h3>
+          <div class="theme-options">
+            <button class="theme-option" data-board-theme="wood">
+              <div class="theme-preview wood-preview"></div>
+              <span>🪵 Fa</span>
+            </button>
+            <button class="theme-option" data-board-theme="marble">
+              <div class="theme-preview marble-preview"></div>
+              <span>🏛️ Márvány</span>
+            </button>
+            <button class="theme-option" data-board-theme="neon">
+              <div class="theme-preview neon-preview"></div>
+              <span>💎 Neon</span>
+            </button>
+            <button class="theme-option" data-board-theme="forest">
+              <div class="theme-preview forest-preview"></div>
+              <span>🌲 Erdő</span>
+            </button>
+            <button class="theme-option" data-board-theme="ocean">
+              <div class="theme-preview ocean-preview"></div>
+              <span>🌊 Óceán</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="theme-section">
+          <h3>🎯 Bábu Színek</h3>
+          <div class="theme-options">
+            <button class="theme-option" data-piece-color="classic">
+              <div class="piece-color-preview">
+                <span class="preview-piece classic-p1"></span>
+                <span class="preview-piece classic-p2"></span>
+              </div>
+              <span>Klasszikus</span>
+            </button>
+            <button class="theme-option" data-piece-color="neon">
+              <div class="piece-color-preview">
+                <span class="preview-piece neon-p1"></span>
+                <span class="preview-piece neon-p2"></span>
+              </div>
+              <span>💫 Neon</span>
+            </button>
+            <button class="theme-option" data-piece-color="pastel">
+              <div class="piece-color-preview">
+                <span class="preview-piece pastel-p1"></span>
+                <span class="preview-piece pastel-p2"></span>
+              </div>
+              <span>🌸 Pasztel</span>
+            </button>
+            <button class="theme-option" data-piece-color="vibrant">
+              <div class="piece-color-preview">
+                <span class="preview-piece vibrant-p1"></span>
+                <span class="preview-piece vibrant-p2"></span>
+              </div>
+              <span>🔥 Élénk</span>
+            </button>
+            <button class="theme-option" data-piece-color="nature">
+              <div class="piece-color-preview">
+                <span class="preview-piece nature-p1"></span>
+                <span class="preview-piece nature-p2"></span>
+              </div>
+              <span>🍃 Természet</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Victory Modal -->
     <div id="victoryModal" class="victory-modal" style="display: none;">
       <div class="victory-modal-content">
@@ -36,6 +113,32 @@
           <button id="victoryNewGameBtn" class="btn btn-primary victory-btn">🔄 Új játék</button>
           <button id="victoryLeaveBtn" class="btn btn-danger victory-btn">🚪 Kilépés</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Defeat Modal -->
+    <div id="defeatModal" class="defeat-modal" style="display: none;">
+      <div class="defeat-modal-content">
+        <div class="defeat-icon">😢</div>
+        <h1 class="defeat-title">Vesztettél!</h1>
+        <p class="defeat-winner" id="defeatWinnerName"></p>
+        <p class="defeat-message">Győzött ebben a játékban.</p>
+        <p class="defeat-encouragement">Ne add fel! Próbáld újra! 💪</p>
+        <div class="defeat-buttons">
+          <button id="defeatNewGameBtn" class="btn btn-primary defeat-btn">🔄 Új játék</button>
+          <button id="defeatLeaveBtn" class="btn btn-danger defeat-btn">🚪 Kilépés</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Message Modal (for alerts/info) -->
+    <div id="messageModal" class="message-modal" style="display: none;">
+      <div class="message-modal-content">
+        <span class="message-modal-close">&times;</span>
+        <div id="messageModalIcon" class="message-modal-icon">ℹ️</div>
+        <h2 id="messageModalTitle" class="message-modal-title">Üzenet</h2>
+        <p id="messageModalText" class="message-modal-text"></p>
+        <button id="messageModalBtn" class="btn btn-primary">OK</button>
       </div>
     </div>
 
@@ -94,11 +197,54 @@
           <h3>Aktív Szobák (<span id="roomsCount">0</span>)</h3>
           <div id="adminRoomsList" class="admin-list"></div>
         </div>
+        <div class="admin-section">
+          <h3>📊 Játék Statisztikák</h3>
+          <div class="stats-summary">
+            <div class="stat-card">
+              <div class="stat-value" id="totalGames">0</div>
+              <div class="stat-label">Összes játék</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="activeGames">0</div>
+              <div class="stat-label">Aktív játékok</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="completedGames">0</div>
+              <div class="stat-label">Befejezett</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="aiWinRate">0%</div>
+              <div class="stat-label">AI győzelmi arány</div>
+            </div>
+          </div>
+          <div class="charts-grid">
+            <div class="chart-container">
+              <h4>⏰ Peak időpontok (24h)</h4>
+              <canvas id="peakTimesChart"></canvas>
+            </div>
+            <div class="chart-container">
+              <h4>📏 Népszerű táblaméretek</h4>
+              <canvas id="boardSizesChart"></canvas>
+            </div>
+            <div class="chart-container">
+              <h4>🎮 Játék módok</h4>
+              <canvas id="gameModesChart"></canvas>
+            </div>
+            <div class="chart-container">
+              <h4>🏆 Eredmények</h4>
+              <canvas id="resultsChart"></canvas>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Login Screen -->
     <div id="loginScreen" class="login-screen">
+      <div class="theme-controls">
+        <button id="themeToggleBtn" class="theme-btn" title="Dark/Light mode">🌓</button>
+        <button id="themeSettingsBtn" class="theme-btn" title="Témák">🎨</button>
+      </div>
       <div class="login-card">
         <h2>🎮 Bejelentkezés</h2>
         <p>Add meg a neved a játékhoz</p>
@@ -118,7 +264,12 @@
           <span class="welcome-greeting">👋 Üdvözöljük, </span>
           <span id="welcomePlayerName" class="welcome-name"></span>
         </div>
-        <button id="logoutBtn" class="btn btn-danger">Kilépés</button>
+        <div class="welcome-controls">
+          <button id="themeToggleBtnLobby" class="theme-btn" title="Dark/Light mode">🌓</button>
+          <button id="themeSettingsBtnLobby" class="theme-btn" title="Témák">🎨</button>
+          <button id="viewStatsBtn" class="btn btn-secondary">📊 Statisztikák</button>
+          <button id="logoutBtn" class="btn btn-danger">Kilépés</button>
+        </div>
       </div>
 
       <div class="lobby-container">
@@ -175,10 +326,60 @@
       </div>
     </div>
 
+    <!-- Statistics View -->
+    <div id="statsView" class="stats-view" style="display: none;">
+      <div class="stats-header">
+        <h2>📊 Játék Statisztikák</h2>
+        <button id="backToLobbyBtn" class="btn btn-primary">⬅️ Vissza a lobbyba</button>
+      </div>
+      <div class="stats-content">
+        <div class="stats-summary">
+          <div class="stat-card">
+            <div class="stat-value" id="statsTotalGames">0</div>
+            <div class="stat-label">Összes játék</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statsActiveGames">0</div>
+            <div class="stat-label">Aktív játékok</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statsCompletedGames">0</div>
+            <div class="stat-label">Befejezett</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statsAiWinRate">0%</div>
+            <div class="stat-label">AI győzelmi arány</div>
+          </div>
+        </div>
+        <div class="charts-grid">
+          <div class="chart-container">
+            <h4>⏰ Peak időpontok (24h)</h4>
+            <canvas id="statsPeakTimesChart"></canvas>
+          </div>
+          <div class="chart-container">
+            <h4>📏 Népszerű táblaméretek</h4>
+            <canvas id="statsBoardSizesChart"></canvas>
+          </div>
+          <div class="chart-container">
+            <h4>🎮 Játék módok</h4>
+            <canvas id="statsGameModesChart"></canvas>
+          </div>
+          <div class="chart-container">
+            <h4>🏆 Eredmények</h4>
+            <canvas id="statsResultsChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="gameArea" class="game-area" style="display: none;">
       <div class="game-info">
         <div id="roomIdDisplay" class="room-id-display" style="display: none;"></div>
-        <div class="players-info">
+        <div class="game-info-header">
+          <div class="game-theme-controls">
+            <button id="themeToggleBtnGame" class="theme-btn" title="Dark/Light mode">🌓</button>
+            <button id="themeSettingsBtnGame" class="theme-btn" title="Témák">🎨</button>
+          </div>
           <div id="player1Info" class="player-info">
             <span class="player-symbol">X</span>
             <span class="player-name">Várakozás...</span>

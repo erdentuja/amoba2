@@ -3,9 +3,14 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const path = require('path');
+const fs = require('fs').promises;
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_CODE = process.env.ADMIN_CODE || 'admin123'; // Change this in production!
+
+// Data file paths
+const STATS_FILE = path.join(__dirname, 'data', 'stats.json');
+const CHAT_HISTORY_FILE = path.join(__dirname, 'data', 'chat-history.json');
 
 // Global timer settings (admin configurable)
 let globalTimerSettings = {
@@ -16,6 +21,19 @@ let globalTimerSettings = {
 // Global AI settings (admin configurable)
 let globalAISettings = {
   aiVsAiEnabled: false // AI vs AI mode toggle
+};
+
+// Game statistics tracking
+let gameStats = {
+  totalGames: 0,
+  totalGamesCompleted: 0,
+  activeGames: 0,
+  peakTimes: Array(24).fill(0), // Hourly game count
+  boardSizes: { '9': 0, '13': 0, '15': 0, '19': 0 },
+  gameModes: { 'pvp': 0, 'ai-easy': 0, 'ai-medium': 0, 'ai-hard': 0, 'ai-vs-ai': 0 },
+  aiWins: 0,
+  playerWins: 0,
+  draws: 0
 };
 
 // Balambér chatbot messages
@@ -36,6 +54,9 @@ const balamberMessages = [
   'Néha csak nézem a játékokat és tanulok belőlük. Ti is így csináljátok? 👀',
   'Ki szereti a 15x15-ös táblát? Én azt mondom, minél nagyobb, annál jobb! 🎯'
 ];
+
+// Lobby chat history (last 10 messages)
+let lobbyChatHistory = [];
 
 // Track connected clients
 const connectedClients = new Map(); // socketId -> {name, isAdmin, connectedAt, createdRoom}
@@ -83,7 +104,7 @@ class GomokuAI {
     switch(difficulty) {
       case 'easy': return 1;
       case 'medium': return 2;
-      case 'hard': return 3;
+      case 'hard': return 2;  // Reduced from 3 to 2 to prevent freezing
       default: return 2;
     }
   }
@@ -161,11 +182,12 @@ class GomokuAI {
       return [[center, center]];
     }
 
-    // Get cells near occupied ones (within 2 cells)
+    // Get cells near occupied ones - use smaller radius for better performance
+    const radius = this.difficulty === 'hard' ? 1 : 2;  // Smaller search area for hard mode
     const nearbyMoves = new Set();
     for (const [row, col] of occupied) {
-      for (let dr = -2; dr <= 2; dr++) {
-        for (let dc = -2; dc <= 2; dc++) {
+      for (let dr = -radius; dr <= radius; dr++) {
+        for (let dc = -radius; dc <= radius; dc++) {
           const r = row + dr;
           const c = col + dc;
           if (r >= 0 && r < boardSize && c >= 0 && c < boardSize && board[r][c] === null) {
@@ -179,6 +201,13 @@ class GomokuAI {
       const [r, c] = key.split(',').map(Number);
       moves.push([r, c]);
     });
+
+    // Limit number of moves to consider (for performance)
+    if (moves.length > 25) {
+      // Sort moves by importance and take top 25
+      moves.sort(() => Math.random() - 0.5);  // Simple randomization
+      return moves.slice(0, 25);
+    }
 
     return moves.length > 0 ? moves : this.getAllEmptyCells(board, boardSize);
   }
@@ -257,6 +286,14 @@ class GomokuAI {
     return null;
   }
 
+  // Evaluate immediate value of a move (for move ordering)
+  evaluateMove(board, boardSize, row, col, symbol) {
+    board[row][col] = symbol;
+    const score = this.evaluateBoard(board, boardSize, symbol, symbol === 'X' ? 'O' : 'X');
+    board[row][col] = null;
+    return score;
+  }
+
   // Get best move
   getBestMove(board, boardSize, aiSymbol, playerSymbol) {
     const moves = this.getPossibleMoves(board, boardSize);
@@ -270,7 +307,15 @@ class GomokuAI {
       return moves[Math.floor(Math.random() * moves.length)];
     }
 
-    for (const [row, col] of moves) {
+    // Sort moves by immediate value for better alpha-beta pruning
+    const scoredMoves = moves.map(move => ({
+      move,
+      score: this.evaluateMove(board, boardSize, move[0], move[1], aiSymbol)
+    }));
+    scoredMoves.sort((a, b) => b.score - a.score);
+
+    for (const { move } of scoredMoves) {
+      const [row, col] = move;
       board[row][col] = aiSymbol;
       const moveValue = this.minimax(board, boardSize, this.maxDepth, -Infinity, Infinity, false, aiSymbol, playerSymbol);
       board[row][col] = null;
@@ -648,6 +693,15 @@ function broadcastLobbyPlayers() {
   io.emit('lobbyPlayers', playersList);
 }
 
+// Broadcast game statistics to all admins
+function broadcastStatsToAdmins() {
+  connectedClients.forEach((client, sid) => {
+    if (client.isAdmin) {
+      io.to(sid).emit('gameStats', gameStats);
+    }
+  });
+}
+
 // Start AI vs AI automatic game
 function startAIvsAIGame(roomId) {
   const room = rooms.get(roomId);
@@ -684,11 +738,28 @@ function startAIvsAIGame(roomId) {
       io.to(roomId).emit('gameState', room.getState());
 
       if (result.gameOver) {
+        // Track statistics - AI vs AI game ended
+        gameStats.activeGames = Math.max(0, gameStats.activeGames - 1);
+        gameStats.totalGamesCompleted++;
+
         if (result.draw) {
+          gameStats.draws++;
           io.to(roomId).emit('message', '🤝 Döntetlen!');
+          // Announce AI vs AI draw to lobby
+          announceGameResult(currentPlayer.name, otherPlayer.name, true);
         } else {
+          gameStats.aiWins++; // Both players are AI
           io.to(roomId).emit('message', `🏆 ${result.winner.name} nyert!`);
+          // Announce AI vs AI winner to lobby
+          const loser = room.players.find(p => p.id !== result.winner.id);
+          announceGameResult(result.winner.name, loser?.name || 'AI Ellenfél');
         }
+
+        // Save stats to file
+        saveStats().catch(err => console.error('Failed to save stats:', err));
+
+        // Broadcast updated stats to admins
+        broadcastStatsToAdmins();
       } else {
         // Schedule next move
         setTimeout(makeNextAIMove, 800); // 800ms delay between moves
@@ -724,6 +795,19 @@ io.on('connection', (socket) => {
   socket.on('login', ({ playerName }) => {
     const name = playerName || `Player_${socket.id.substring(0, 4)}`;
 
+    // Check if name is already taken
+    let nameTaken = false;
+    connectedClients.forEach((client, socketId) => {
+      if (client.name === name && socketId !== socket.id) {
+        nameTaken = true;
+      }
+    });
+
+    if (nameTaken) {
+      socket.emit('error', `A "${name}" név már foglalt! Kérlek válassz másik nevet.`);
+      return;
+    }
+
     // Add to connected clients
     connectedClients.set(socket.id, {
       name: name,
@@ -741,6 +825,24 @@ io.on('connection', (socket) => {
 
     socket.emit('loginSuccess', { playerName: name });
     console.log('Player logged in:', name, socket.id);
+
+    // Send lobby chat history to the newly logged-in player
+    setTimeout(() => {
+      lobbyChatHistory.forEach(msg => {
+        socket.emit('lobbyChatMessage', msg);
+      });
+    }, 100);
+
+    // Announce login to lobby (with slight delay to ensure client is ready)
+    setTimeout(() => {
+      const loginMessages = [
+        `👋 ${name} belépett a lobbiba! Üdv! 🎮`,
+        `🎉 ${name} csatlakozott! Hajrá! 💪`,
+        `✨ ${name} érkezett! Sok sikert! 🍀`,
+        `🚀 ${name} itt van! Rajta! ⚡`
+      ];
+      announceLobbyEvent(loginMessages[Math.floor(Math.random() * loginMessages.length)]);
+    }, 200);
 
     // Broadcast updated players list to admins and lobby
     broadcastOnlinePlayers();
@@ -776,11 +878,26 @@ io.on('connection', (socket) => {
     const newRoom = new GameRoom(roomId, size, socket.id, client.name, mode);
     rooms.set(roomId, newRoom);
 
+    // Track statistics
+    gameStats.totalGames++;
+    gameStats.boardSizes[size] = (gameStats.boardSizes[size] || 0) + 1;
+    gameStats.gameModes[mode] = (gameStats.gameModes[mode] || 0) + 1;
+    saveStats(); // Save stats after room creation
+
     // Track that this player created this room
     client.createdRoom = roomId;
 
     socket.emit('roomCreated', { roomId, boardSize: size, gameMode: mode });
     console.log(`Room ${roomId} created by ${client.name} (mode: ${mode})`);
+
+    // Announce room creation to lobby
+    const gameModeText = mode === 'pvp' ? 'PvP' : mode === 'ai-vs-ai' ? 'AI vs AI' : `AI ${mode.split('-')[1]}`;
+    const roomMessages = [
+      `🎮 ${client.name} létrehozott egy ${size}x${size} szobát (${gameModeText})! 🆕`,
+      `🏗️ ${client.name} új szobát nyitott: ${size}x${size} (${gameModeText})! ✨`,
+      `🎯 ${client.name} szobát készített: ${size}x${size} (${gameModeText})! 🚀`
+    ];
+    announceLobbyEvent(roomMessages[Math.floor(Math.random() * roomMessages.length)]);
 
     // Broadcast updated rooms list
     broadcastRoomsList();
@@ -802,6 +919,7 @@ io.on('connection', (socket) => {
         socket.emit('onlinePlayers', getOnlinePlayersList());
         socket.emit('timerSettings', globalTimerSettings);
         socket.emit('aiSettings', globalAISettings);
+        socket.emit('gameStats', gameStats);
         console.log('Admin logged in:', socket.id);
       }
     } else {
@@ -832,6 +950,11 @@ io.on('connection', (socket) => {
       // Update connected client info
       client.room = roomId;
 
+      // Clear createdRoom flag since player actually joined
+      if (client.createdRoom === roomId) {
+        client.createdRoom = null;
+      }
+
       io.to(roomId).emit('gameState', room.getState());
       io.to(roomId).emit('message', `${client.name} csatlakozott a játékhoz`);
 
@@ -845,6 +968,23 @@ io.on('connection', (socket) => {
 
       if (room.players.length === 2) {
         io.to(roomId).emit('message', 'Játék elindult! X kezd.');
+
+        // Track statistics - game started
+        gameStats.activeGames++;
+        const currentHour = new Date().getHours();
+        gameStats.peakTimes[currentHour]++;
+        saveStats(); // Save stats after game start
+
+        // Announce game start to lobby
+        const player1 = room.players[0]?.name || 'Játékos 1';
+        const player2 = room.players[1]?.name || 'Játékos 2';
+        const gameStartMessages = [
+          `⚔️ Játék indult! ${player1} vs ${player2}! Ki fog nyerni? 🎮`,
+          `🔥 Harc kezdődött: ${player1} vs ${player2}! Hajrá! 💪`,
+          `🎯 ${player1} és ${player2} csatáznak! Izgalmas lesz! ⚡`,
+          `🏁 START! ${player1} vs ${player2}! Győzzön a jobb! 🏆`
+        ];
+        announceLobbyEvent(gameStartMessages[Math.floor(Math.random() * gameStartMessages.length)]);
 
         // Start timer for first player
         room.startTimer(() => {
@@ -879,6 +1019,13 @@ io.on('connection', (socket) => {
     }
 
     const room = rooms.get(roomId);
+
+    // Prevent room creator from spectating their own room if not a player
+    if (room.creatorId === socket.id && !room.players.find(p => p.id === socket.id)) {
+      socket.emit('error', 'Nem nézheted meg a saját szobádat nézőként! Csatlakozz játékosként.');
+      return;
+    }
+
     const added = room.addSpectator(socket.id, client.name);
 
     if (added) {
@@ -942,26 +1089,34 @@ io.on('connection', (socket) => {
 
   // Leave room (player leaving game)
   socket.on('leaveRoom', () => {
-    if (!socket.roomId) return;
+    if (!socket.roomId) {
+      return;
+    }
 
     const room = rooms.get(socket.roomId);
-    if (!room) return;
+    if (!room) {
+      socket.roomId = null;
+      return;
+    }
 
     const client = connectedClients.get(socket.id);
     const player = room.players.find(p => p.id === socket.id);
 
     if (player) {
       // If a player leaves, delete the entire room and kick everyone
-      io.to(socket.roomId).emit('message', `${player.name} kilépett - Szoba bezárva`);
       io.to(socket.roomId).emit('roomClosed', { message: 'Játékos kilépett, szoba bezárva' });
 
       // Clear all players and spectators
       room.players.forEach(p => {
-        if (p.id !== socket.id) {
+        if (p.id !== socket.id && !p.isAI) {
           const playerSocket = io.sockets.sockets.get(p.id);
           if (playerSocket) {
             playerSocket.leave(socket.roomId);
             playerSocket.roomId = null;
+            const playerClient = connectedClients.get(p.id);
+            if (playerClient) {
+              playerClient.room = null;
+            }
           }
         }
       });
@@ -972,11 +1127,14 @@ io.on('connection', (socket) => {
           spectatorSocket.leave(socket.roomId);
           spectatorSocket.roomId = null;
           spectatorSocket.isSpectator = false;
+          const spectatorClient = connectedClients.get(spectator.id);
+          if (spectatorClient) {
+            spectatorClient.room = null;
+          }
         }
       });
 
       rooms.delete(socket.roomId);
-      console.log(`Room ${socket.roomId} deleted because ${player.name} left`);
     }
 
     socket.leave(socket.roomId);
@@ -1003,11 +1161,34 @@ io.on('connection', (socket) => {
       io.to(socket.roomId).emit('gameState', room.getState());
 
       if (result.gameOver) {
+        // Track statistics - game ended
+        gameStats.activeGames = Math.max(0, gameStats.activeGames - 1);
+        gameStats.totalGamesCompleted++;
+
         if (result.draw) {
+          gameStats.draws++;
           io.to(socket.roomId).emit('message', "It's a draw!");
+          // Announce draw to lobby
+          const player1 = room.players[0]?.name || 'Játékos 1';
+          const player2 = room.players[1]?.name || 'Játékos 2';
+          announceGameResult(player1, player2, true);
         } else {
+          // Track AI wins vs player wins
+          if (result.winner.isAI) {
+            gameStats.aiWins++;
+          } else {
+            gameStats.playerWins++;
+          }
+          saveStats(); // Save stats after game end
+
           io.to(socket.roomId).emit('message', `${result.winner.name} wins!`);
+          // Announce winner to lobby
+          const loser = room.players.find(p => p.id !== result.winner.id);
+          announceGameResult(result.winner.name, loser?.name || 'Ellenfél');
         }
+
+        // Broadcast updated stats to admins
+        broadcastStatsToAdmins();
       } else {
         // Start timer for next player
         room.startTimer(() => {
@@ -1030,11 +1211,33 @@ io.on('connection', (socket) => {
               io.to(socket.roomId).emit('gameState', room.getState());
 
               if (aiResult.gameOver) {
+                // Track statistics - AI game ended
+                gameStats.activeGames = Math.max(0, gameStats.activeGames - 1);
+                gameStats.totalGamesCompleted++;
+
                 if (aiResult.draw) {
+                  gameStats.draws++;
                   io.to(socket.roomId).emit('message', "It's a draw!");
+                  // Announce draw to lobby
+                  const player1 = room.players[0]?.name || 'Játékos 1';
+                  const player2 = room.players[1]?.name || 'Játékos 2';
+                  announceGameResult(player1, player2, true);
                 } else {
+                  // Track AI wins vs player wins
+                  if (aiResult.winner.isAI) {
+                    gameStats.aiWins++;
+                  } else {
+                    gameStats.playerWins++;
+                  }
+
                   io.to(socket.roomId).emit('message', `${aiResult.winner.name} wins!`);
+                  // Announce winner to lobby
+                  const loser = room.players.find(p => p.id !== aiResult.winner.id);
+                  announceGameResult(aiResult.winner.name, loser?.name || 'Ellenfél');
                 }
+
+                // Broadcast updated stats to admins
+                broadcastStatsToAdmins();
               }
             }
           }, 500);  // 500ms delay to make AI feel more natural
@@ -1079,15 +1282,21 @@ io.on('connection', (socket) => {
     const trimmedMessage = message.trim();
     if (trimmedMessage.length === 0 || trimmedMessage.length > 200) return;
 
+    // Create message object
+    const chatMessage = {
+      senderId: socket.id,
+      senderName: client.name,
+      message: trimmedMessage,
+      timestamp: Date.now()
+    };
+
+    // Add to chat history
+    addToLobbyChatHistory(chatMessage);
+
     // Broadcast message to everyone in lobby (not in a room)
     connectedClients.forEach((c, sid) => {
       if (!c.room && !c.isAdmin) {
-        io.to(sid).emit('lobbyChatMessage', {
-          senderId: socket.id,
-          senderName: client.name,
-          message: trimmedMessage,
-          timestamp: Date.now()
-        });
+        io.to(sid).emit('lobbyChatMessage', chatMessage);
       }
     });
   });
@@ -1283,21 +1492,46 @@ io.on('connection', (socket) => {
     console.log('AI settings updated:', globalAISettings);
   });
 
+  // Handle stats request (for public statistics view)
+  socket.on('requestStats', () => {
+    socket.emit('gameStats', gameStats);
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
 
     const client = connectedClients.get(socket.id);
 
+    // Announce disconnect to lobby (if not admin and has name)
+    if (client && !client.isAdmin && client.name) {
+      const disconnectMessages = [
+        `👋 ${client.name} kilépett... Szia! 😢`,
+        `🚪 ${client.name} távozott... Viszlát! 👋`,
+        `💨 ${client.name} elment... Gyere vissza! 🙏`,
+        `😔 ${client.name} otthagyta a lobbyt... 💔`
+      ];
+      announceLobbyEvent(disconnectMessages[Math.floor(Math.random() * disconnectMessages.length)]);
+    }
+
     // Remove from connected clients and logged in players
     connectedClients.delete(socket.id);
     loggedInPlayers.delete(socket.id);
 
-    // If player created a room, delete it if empty
+    // If player created a room, delete it if they never joined as a player
     if (client && client.createdRoom) {
       const createdRoom = rooms.get(client.createdRoom);
-      if (createdRoom && createdRoom.players.length === 0) {
-        rooms.delete(client.createdRoom);
-        console.log(`Deleted empty room ${client.createdRoom} created by ${client.name}`);
+      if (createdRoom) {
+        // Check if the creator is actually a player in the room
+        const isPlayerInRoom = createdRoom.players.find(p => p.id === socket.id && !p.isAI);
+
+        // Delete room if creator never joined, OR if it's an AI vs AI room (creator is not a player)
+        if (!isPlayerInRoom) {
+          // Notify anyone watching (spectators or AI vs AI watchers)
+          io.to(client.createdRoom).emit('roomClosed', { message: 'A szoba létrehozója kilépett, szoba bezárva' });
+
+          rooms.delete(client.createdRoom);
+          console.log(`Deleted room ${client.createdRoom} created by ${client.name} (creator left without joining)`);
+        }
       }
     }
 
@@ -1310,7 +1544,6 @@ io.on('connection', (socket) => {
 
         if (isPlayer) {
           // If a player disconnects, delete the entire room
-          io.to(socket.roomId).emit('message', `${player.name} kilépett - Szoba bezárva`);
           io.to(socket.roomId).emit('roomClosed', { message: 'Játékos kilépett, szoba bezárva' });
 
           // Kick all spectators back to lobby
@@ -1345,6 +1578,64 @@ io.on('connection', (socket) => {
   });
 });
 
+// Balambér announces game result to lobby
+function announceGameResult(winnerName, loserName, isDraw = false) {
+  // Check if there are players in lobby (not in a room and not admin)
+  const lobbyPlayers = [];
+  connectedClients.forEach((client, sid) => {
+    if (!client.room && !client.isAdmin) {
+      lobbyPlayers.push(sid);
+    }
+  });
+
+  // Only send if there are players in lobby
+  if (lobbyPlayers.length > 0) {
+    let message;
+    if (isDraw) {
+      message = `⚡ Döntetlen! ${winnerName} és ${loserName} nem tudtak nyerni! 🤝`;
+    } else {
+      const announcements = [
+        `🏆 ${winnerName} legyőzte ${loserName}-t! Gratulálok! 🎉`,
+        `⚔️ ${winnerName} nyert ${loserName} ellen! Szép játék! 👏`,
+        `🎯 ${winnerName} győzött! ${loserName} legközelebb több szerencsét! 🍀`,
+        `🔥 ${winnerName} simán verte ${loserName}-t! Respect! 💪`,
+        `✨ ${winnerName} csapata nyert! ${loserName} majd legközelebb! 😊`
+      ];
+      message = announcements[Math.floor(Math.random() * announcements.length)];
+    }
+
+    announceLobbyEvent(message);
+  }
+}
+
+// Generic function to announce events to lobby
+function announceLobbyEvent(message, excludeSocketId = null) {
+  const lobbyPlayers = [];
+  connectedClients.forEach((client, sid) => {
+    if (!client.room && !client.isAdmin && sid !== excludeSocketId) {
+      lobbyPlayers.push(sid);
+    }
+  });
+
+  if (lobbyPlayers.length > 0) {
+    const chatMessage = {
+      senderId: 'bot',
+      senderName: '🤖 Balambér',
+      message: message,
+      timestamp: Date.now()
+    };
+
+    // Add to chat history
+    addToLobbyChatHistory(chatMessage);
+
+    lobbyPlayers.forEach(sid => {
+      io.to(sid).emit('lobbyChatMessage', chatMessage);
+    });
+
+    console.log(`Balambér announced: "${message}" to ${lobbyPlayers.length} players`);
+  }
+}
+
 // Balambér chatbot - sends random messages to lobby
 function sendBalamberMessage() {
   // Check if there are players in lobby (not in a room and not admin)
@@ -1359,13 +1650,18 @@ function sendBalamberMessage() {
   if (lobbyPlayers.length > 0) {
     const randomMessage = balamberMessages[Math.floor(Math.random() * balamberMessages.length)];
 
+    const chatMessage = {
+      senderId: 'bot',
+      senderName: '🤖 Balambér',
+      message: randomMessage,
+      timestamp: Date.now()
+    };
+
+    // Add to chat history
+    addToLobbyChatHistory(chatMessage);
+
     lobbyPlayers.forEach(sid => {
-      io.to(sid).emit('lobbyChatMessage', {
-        senderId: 'bot',
-        senderName: '🤖 Balambér',
-        message: randomMessage,
-        timestamp: Date.now()
-      });
+      io.to(sid).emit('lobbyChatMessage', chatMessage);
     });
 
     console.log(`Balambér said: "${randomMessage}" to ${lobbyPlayers.length} players`);
@@ -1381,13 +1677,109 @@ function scheduleNextBalamberMessage() {
   }, delay);
 }
 
-http.listen(PORT, '0.0.0.0', () => {
+// === Data Persistence Functions ===
+
+// Ensure data directory exists
+async function ensureDataDirectory() {
+  const dataDir = path.join(__dirname, 'data');
+  try {
+    await fs.mkdir(dataDir, { recursive: true });
+  } catch (error) {
+    console.error('Error creating data directory:', error);
+  }
+}
+
+// Save statistics to file
+async function saveStats() {
+  try {
+    await ensureDataDirectory();
+    await fs.writeFile(STATS_FILE, JSON.stringify(gameStats, null, 2));
+    console.log('📊 Statistics saved');
+  } catch (error) {
+    console.error('Error saving statistics:', error);
+  }
+}
+
+// Load statistics from file
+async function loadStats() {
+  try {
+    const data = await fs.readFile(STATS_FILE, 'utf8');
+    const loadedStats = JSON.parse(data);
+    // Merge loaded stats with default structure (in case of new fields)
+    gameStats = { ...gameStats, ...loadedStats };
+    console.log('📊 Statistics loaded from file');
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error('Error loading statistics:', error);
+    } else {
+      console.log('📊 No previous statistics found, starting fresh');
+    }
+  }
+}
+
+// Save chat history to file
+async function saveChatHistory() {
+  try {
+    await ensureDataDirectory();
+    await fs.writeFile(CHAT_HISTORY_FILE, JSON.stringify(lobbyChatHistory, null, 2));
+    console.log('💬 Chat history saved');
+  } catch (error) {
+    console.error('Error saving chat history:', error);
+  }
+}
+
+// Load chat history from file
+async function loadChatHistory() {
+  try {
+    const data = await fs.readFile(CHAT_HISTORY_FILE, 'utf8');
+    lobbyChatHistory = JSON.parse(data);
+    console.log('💬 Chat history loaded from file');
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error('Error loading chat history:', error);
+    } else {
+      console.log('💬 No previous chat history found, starting fresh');
+    }
+  }
+}
+
+// Add message to lobby chat history (keep last 10)
+function addToLobbyChatHistory(message) {
+  lobbyChatHistory.push(message);
+  // Keep only last 10 messages
+  if (lobbyChatHistory.length > 10) {
+    lobbyChatHistory = lobbyChatHistory.slice(-10);
+  }
+  // Save to file (async, don't wait)
+  saveChatHistory().catch(err => console.error('Failed to save chat history:', err));
+}
+
+// Start server and load data
+async function startServer() {
+  // Load persisted data
+  await loadStats();
+  await loadChatHistory();
+
+  http.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Open http://localhost:${PORT} in your browser`);
 
-  // Start Balambér chatbot after 30 seconds
-  setTimeout(() => {
-    console.log('🤖 Balambér chatbot activated!');
-    scheduleNextBalamberMessage();
-  }, 30000);
-});
+    // Start Balambér chatbot after 30 seconds
+    setTimeout(() => {
+      console.log('🤖 Balambér chatbot activated!');
+      scheduleNextBalamberMessage();
+    }, 30000);
+
+    // Send lobby chat history to new players when they join
+    io.on('connection', (socket) => {
+      socket.on('requestLobbyChatHistory', () => {
+        lobbyChatHistory.forEach(msg => {
+          socket.emit('lobbyChatMessage', msg);
+        });
+      });
+    });
+  });
+}
+
+// Start the server
+startServer();

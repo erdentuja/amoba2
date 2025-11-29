@@ -40,6 +40,15 @@ const chatSendBtn = document.getElementById('chatSendBtn');
 const lobbyChatMessages = document.getElementById('lobbyChatMessages');
 const lobbyChatInput = document.getElementById('lobbyChatInput');
 const lobbyChatSendBtn = document.getElementById('lobbyChatSendBtn');
+const viewStatsBtn = document.getElementById('viewStatsBtn');
+const backToLobbyBtn = document.getElementById('backToLobbyBtn');
+const statsView = document.getElementById('statsView');
+const defeatModal = document.getElementById('defeatModal');
+const defeatNewGameBtn = document.getElementById('defeatNewGameBtn');
+const defeatLeaveBtn = document.getElementById('defeatLeaveBtn');
+const messageModal = document.getElementById('messageModal');
+const messageModalClose = document.querySelector('.message-modal-close');
+const messageModalBtn = document.getElementById('messageModalBtn');
 
 // Game state
 let socket = null;
@@ -172,13 +181,29 @@ function init() {
     soundBtn.textContent = soundEnabled ? '🔊 Hang BE' : '🔇 Hang KI';
     soundBtn.classList.toggle('sound-off', !soundEnabled);
   }
+
+  // Auto-login if player name is saved
+  const savedPlayerName = localStorage.getItem('playerName');
+  if (savedPlayerName) {
+    // Wait for socket connection to be established
+    setTimeout(() => {
+      if (socket) {
+        socket.emit('login', { playerName: savedPlayerName });
+      }
+    }, 100);
+  }
 }
 
 // Initialize socket connection
 function initSocketConnection() {
   if (!socket) {
     socket = io();
-    myPlayerId = socket.id;
+
+    // Set myPlayerId when connected
+    socket.on('connect', () => {
+      myPlayerId = socket.id;
+      console.log('🔌 Socket connected! My ID:', myPlayerId);
+    });
 
     // Handle rooms list updates
     socket.on('roomsList', (rooms) => {
@@ -197,6 +222,9 @@ function initSocketConnection() {
       loginScreen.style.display = 'none';
       lobby.style.display = 'flex';
 
+      // Save player name to localStorage for auto-login on refresh
+      localStorage.setItem('playerName', playerName);
+
       // Update welcome section
       if (welcomePlayerName) {
         welcomePlayerName.textContent = playerName;
@@ -213,7 +241,7 @@ function initSocketConnection() {
     // Handle errors
     socket.on('error', (error) => {
       sounds.error();
-      alert(error);
+      showModalMessage(error, 'error');
     });
 
     // Handle game state updates (for both players and spectators)
@@ -306,7 +334,6 @@ function initSocketConnection() {
 
     // Handle room closed
     socket.on('roomClosed', ({ message }) => {
-      alert(message || 'A szoba bezárva');
       isSpectator = false;
       currentRoomId = null;
       gameArea.style.display = 'none';
@@ -388,15 +415,33 @@ function setupEventListeners() {
   leaveBtn.addEventListener('click', leaveGame);
   leaveSpectatorBtn.addEventListener('click', handleLeaveSpectator);
   logoutBtn.addEventListener('click', handleLogout);
+  viewStatsBtn.addEventListener('click', showStatsView);
+  backToLobbyBtn.addEventListener('click', hideStatsView);
+
+  // Canvas events for both mouse and touch
   canvas.addEventListener('click', handleCanvasClick);
+  canvas.addEventListener('touchstart', handleCanvasClick, { passive: false });
 
   // Victory modal controls
   if (victoryNewGameBtn) victoryNewGameBtn.addEventListener('click', requestNewGame);
   if (victoryLeaveBtn) victoryLeaveBtn.addEventListener('click', leaveGameFromVictory);
 
+  // Defeat modal controls
+  if (defeatNewGameBtn) defeatNewGameBtn.addEventListener('click', requestNewGame);
+  if (defeatLeaveBtn) defeatLeaveBtn.addEventListener('click', leaveGameFromVictory);
+
   // New game request modal
   if (acceptNewGameBtn) acceptNewGameBtn.addEventListener('click', acceptNewGame);
   if (declineNewGameBtn) declineNewGameBtn.addEventListener('click', declineNewGame);
+
+  // Message modal controls
+  if (messageModalClose) messageModalClose.addEventListener('click', hideMessageModal);
+  if (messageModalBtn) messageModalBtn.addEventListener('click', hideMessageModal);
+  if (messageModal) {
+    messageModal.addEventListener('click', (e) => {
+      if (e.target === messageModal) hideMessageModal();
+    });
+  }
 }
 
 // Handle login
@@ -404,7 +449,7 @@ function handleLogin() {
   const playerName = loginPlayerNameInput.value.trim();
 
   if (!playerName) {
-    alert('Kérlek add meg a neved!');
+    showModalMessage('Kérlek add meg a neved!', 'warning');
     return;
   }
 
@@ -419,7 +464,7 @@ function handleCreateRoom() {
   const gameMode = document.getElementById('gameMode').value;
 
   if (!isLoggedIn) {
-    alert('Kérlek először jelentkezz be!');
+    showModalMessage('Kérlek először jelentkezz be!', 'warning');
     return;
   }
 
@@ -506,14 +551,56 @@ function kickPlayerFromLobby(socketId) {
 // Handle logout
 function handleLogout() {
   if (confirm('Biztosan ki szeretnél lépni?')) {
-    location.reload();
+    // Clear saved player name
+    localStorage.removeItem('playerName');
+
+    // Reset state
+    isLoggedIn = false;
+    myPlayerName = null;
+    myPlayerId = null;
+    gameState = null;
+    currentRoomId = null;
+    isSpectator = false;
+
+    // Disconnect socket
+    if (socket) {
+      socket.disconnect();
+      socket = null;
+    }
+
+    // Show login screen
+    loginScreen.style.display = 'flex';
+    lobby.style.display = 'none';
+    gameArea.style.display = 'none';
+    adminPanel.style.display = 'none';
+
+    // Clear input
+    loginPlayerNameInput.value = '';
+
+    // Reconnect socket for next login
+    initSocketConnection();
   }
+}
+
+// Show statistics view
+function showStatsView() {
+  lobby.style.display = 'none';
+  statsView.style.display = 'block';
+
+  // Request stats from server
+  socket.emit('requestStats');
+}
+
+// Hide statistics view and return to lobby
+function hideStatsView() {
+  statsView.style.display = 'none';
+  lobby.style.display = 'flex';
 }
 
 // Watch a game as spectator
 function watchGame(roomId) {
   if (!isLoggedIn) {
-    alert('Kérlek először jelentkezz be!');
+    showModalMessage('Kérlek először jelentkezz be!', 'warning');
     return;
   }
 
@@ -530,11 +617,14 @@ function handleLeaveSpectator() {
 // Join existing room
 function joinExistingRoom(roomId) {
   if (!isLoggedIn) {
-    alert('Kérlek először jelentkezz be!');
+    showModalMessage('Kérlek először jelentkezz be!', 'warning');
     return;
   }
 
   socket.emit('joinRoom', { roomId });
+
+  // Set current room ID
+  currentRoomId = roomId;
 
   // Show game area
   lobby.style.display = 'none';
@@ -543,7 +633,7 @@ function joinExistingRoom(roomId) {
 
 function leaveGame() {
   // Notify server that player is leaving
-  if (socket && socket.roomId) {
+  if (socket && currentRoomId) {
     socket.emit('leaveRoom');
   }
 
@@ -552,7 +642,7 @@ function leaveGame() {
   gameArea.style.display = 'none';
   lobby.style.display = 'flex';
   gameState = null;
-  socket.roomId = null;
+  currentRoomId = null;
 }
 
 function undoMove() {
@@ -610,9 +700,28 @@ function updateTimerDisplay(seconds) {
 function handleCanvasClick(e) {
   if (!gameState || gameState.gameOver) return;
 
+  // Prevent default touch behavior
+  e.preventDefault();
+
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+
+  // Get coordinates from either touch or mouse event
+  let clientX, clientY;
+  if (e.type.startsWith('touch')) {
+    const touch = e.touches[0] || e.changedTouches[0];
+    clientX = touch.clientX;
+    clientY = touch.clientY;
+  } else {
+    clientX = e.clientX;
+    clientY = e.clientY;
+  }
+
+  // Calculate position relative to canvas, accounting for scaling
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const x = (clientX - rect.left) * scaleX;
+  const y = (clientY - rect.top) * scaleY;
 
   const col = Math.floor(x / CELL_SIZE);
   const row = Math.floor(y / CELL_SIZE);
@@ -653,9 +762,30 @@ function updateGameDisplay() {
       // Start winning animation
       startWinningAnimation();
 
-      // Show victory modal (only for players, not spectators)
-      if (!isSpectator) {
-        showVictoryModal(gameState.winner);
+      // Show victory or defeat modal (only for actual players in the game)
+      // Check if I'm actually a player in this game (not spectator, not just watching)
+      console.log('=== GAME OVER DEBUG ===');
+      console.log('Winner:', gameState.winner);
+      console.log('My Player ID:', myPlayerId);
+      console.log('Players:', gameState.players);
+      console.log('Is Spectator:', isSpectator);
+
+      const amIPlayer = gameState.players.some(p => p.id === myPlayerId);
+      console.log('Am I a player?', amIPlayer);
+
+      if (amIPlayer) {
+        // Check if I won or lost
+        if (gameState.winner.id === myPlayerId) {
+          // I won - show victory modal
+          console.log('➡️ I WON! Showing victory modal');
+          showVictoryModal(gameState.winner);
+        } else {
+          // I lost - show defeat modal
+          console.log('➡️ I LOST! Showing defeat modal');
+          showDefeatModal(gameState.winner);
+        }
+      } else {
+        console.log('➡️ Not showing modal - not a player');
       }
     } else {
       currentTurnDiv.textContent = '🤝 Döntetlen!';
@@ -925,7 +1055,7 @@ saveTimerBtn.addEventListener('click', () => {
   const duration = parseInt(timerDurationInput.value);
 
   if (duration < 10 || duration > 300) {
-    alert('Az időtartamnak 10 és 300 másodperc között kell lennie!');
+    showModalMessage('Az időtartamnak 10 és 300 másodperc között kell lennie!', 'warning');
     return;
   }
 
@@ -956,7 +1086,7 @@ function setupAdminListeners() {
   });
 
   socket.on('adminLoginFailed', ({ error }) => {
-    alert(error || 'Helytelen admin kód');
+    showModalMessage(error || 'Helytelen admin kód', 'error');
     adminCodeInput.value = '';
   });
 
@@ -972,13 +1102,10 @@ function setupAdminListeners() {
   });
 
   socket.on('kicked', ({ message }) => {
-    alert(message);
-    location.reload();
-  });
-
-  socket.on('roomClosed', ({ message }) => {
-    alert(message);
-    leaveGame();
+    showModalMessage(message, 'warning');
+    setTimeout(() => {
+      location.reload();
+    }, 2000);
   });
 
   socket.on('timerSettings', (settings) => {
@@ -992,6 +1119,11 @@ function setupAdminListeners() {
     if (aiVsAiEnabledCheckbox) {
       aiVsAiEnabledCheckbox.checked = settings.aiVsAiEnabled;
     }
+  });
+
+  socket.on('gameStats', (stats) => {
+    updateGameStats(stats);
+    updateStatsView(stats);
   });
 }
 
@@ -1055,13 +1187,21 @@ function closeRoom(roomId) {
 
 // Victory modal functions
 function showVictoryModal(winner) {
+  console.log('🏆 showVictoryModal called with winner:', winner);
   const victoryModal = document.getElementById('victoryModal');
   const victoryWinnerName = document.getElementById('victoryWinnerName');
 
-  if (!victoryModal || !victoryWinnerName) return;
+  console.log('Victory modal element:', victoryModal);
+  console.log('Victory winner name element:', victoryWinnerName);
+
+  if (!victoryModal || !victoryWinnerName) {
+    console.error('❌ Victory modal elements not found!');
+    return;
+  }
 
   victoryWinnerName.textContent = winner.name;
   victoryModal.style.display = 'flex';
+  console.log('✅ Victory modal displayed');
 
   // Create confetti effect
   createConfetti();
@@ -1075,16 +1215,85 @@ function closeVictoryModal() {
   }
 }
 
+// Defeat modal functions
+function showDefeatModal(winner) {
+  console.log('😢 showDefeatModal called with winner:', winner);
+  console.log('Defeat modal element:', defeatModal);
+
+  if (!defeatModal) {
+    console.error('❌ Defeat modal element not found!');
+    return;
+  }
+
+  const defeatWinnerName = document.getElementById('defeatWinnerName');
+  console.log('Defeat winner name element:', defeatWinnerName);
+
+  if (defeatWinnerName) {
+    defeatWinnerName.textContent = winner.name;
+  }
+
+  defeatModal.style.display = 'flex';
+  console.log('✅ Defeat modal displayed');
+}
+
+function closeDefeatModal() {
+  if (defeatModal) {
+    defeatModal.style.display = 'none';
+  }
+}
+
+// Message modal functions (replaces alert)
+function showModalMessage(message, type = 'info') {
+  if (!messageModal) return;
+
+  const messageModalIcon = document.getElementById('messageModalIcon');
+  const messageModalTitle = document.getElementById('messageModalTitle');
+  const messageModalText = document.getElementById('messageModalText');
+
+  // Set icon based on type
+  let icon = 'ℹ️';
+  let title = 'Üzenet';
+  if (type === 'error') {
+    icon = '❌';
+    title = 'Hiba';
+    messageModalIcon.className = 'message-modal-icon error';
+  } else if (type === 'success') {
+    icon = '✅';
+    title = 'Siker';
+    messageModalIcon.className = 'message-modal-icon success';
+  } else if (type === 'warning') {
+    icon = '⚠️';
+    title = 'Figyelmeztetés';
+    messageModalIcon.className = 'message-modal-icon warning';
+  } else {
+    messageModalIcon.className = 'message-modal-icon';
+  }
+
+  messageModalIcon.textContent = icon;
+  messageModalTitle.textContent = title;
+  messageModalText.textContent = message;
+
+  messageModal.style.display = 'flex';
+}
+
+function hideMessageModal() {
+  if (messageModal) {
+    messageModal.style.display = 'none';
+  }
+}
+
 // Request new game
 function requestNewGame() {
   closeVictoryModal();
+  closeDefeatModal();
   socket.emit('requestNewGame');
   showMessage('Új játék kérés elküldve...');
 }
 
-// Leave game from victory modal
+// Leave game from victory/defeat modal
 function leaveGameFromVictory() {
   closeVictoryModal();
+  closeDefeatModal();
   leaveGame();
 }
 
@@ -1229,3 +1438,731 @@ if (lobbyChatInput) {
 
 // Start the game
 init();
+
+// Game Statistics Charts
+let peakTimesChart = null;
+let boardSizesChart = null;
+let gameModesChart = null;
+let resultsChart = null;
+
+// Stats view charts (separate instances)
+let statsPeakTimesChart = null;
+let statsBoardSizesChart = null;
+let statsGameModesChart = null;
+let statsResultsChart = null;
+
+function updateGameStats(stats) {
+  // Update stat cards
+  document.getElementById('totalGames').textContent = stats.totalGames || 0;
+  document.getElementById('activeGames').textContent = stats.activeGames || 0;
+  document.getElementById('completedGames').textContent = stats.totalGamesCompleted || 0;
+  
+  // Calculate AI win rate
+  const totalFinished = stats.playerWins + stats.aiWins;
+  const aiWinRate = totalFinished > 0 ? Math.round((stats.aiWins / totalFinished) * 100) : 0;
+  document.getElementById('aiWinRate').textContent = aiWinRate + '%';
+
+  // Update charts
+  updatePeakTimesChart(stats.peakTimes);
+  updateBoardSizesChart(stats.boardSizes);
+  updateGameModesChart(stats.gameModes);
+  updateResultsChart(stats);
+}
+
+// Update stats view (for public statistics page)
+function updateStatsView(stats) {
+  // Update stat cards
+  const statsTotalGames = document.getElementById('statsTotalGames');
+  const statsActiveGames = document.getElementById('statsActiveGames');
+  const statsCompletedGames = document.getElementById('statsCompletedGames');
+  const statsAiWinRate = document.getElementById('statsAiWinRate');
+
+  if (statsTotalGames) statsTotalGames.textContent = stats.totalGames || 0;
+  if (statsActiveGames) statsActiveGames.textContent = stats.activeGames || 0;
+  if (statsCompletedGames) statsCompletedGames.textContent = stats.totalGamesCompleted || 0;
+
+  // Calculate AI win rate
+  const totalFinished = stats.playerWins + stats.aiWins;
+  const aiWinRate = totalFinished > 0 ? Math.round((stats.aiWins / totalFinished) * 100) : 0;
+  if (statsAiWinRate) statsAiWinRate.textContent = aiWinRate + '%';
+
+  // Update charts
+  updateStatsPeakTimesChart(stats.peakTimes);
+  updateStatsBoardSizesChart(stats.boardSizes);
+  updateStatsGameModesChart(stats.gameModes);
+  updateStatsResultsChart(stats);
+}
+
+function updatePeakTimesChart(peakTimes) {
+  const ctx = document.getElementById('peakTimesChart');
+  if (!ctx) return;
+
+  const hours = Array.from({length: 24}, (_, i) => `${i}:00`);
+  
+  if (peakTimesChart) {
+    peakTimesChart.data.datasets[0].data = peakTimes;
+    peakTimesChart.update();
+  } else {
+    peakTimesChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: hours,
+        datasets: [{
+          label: 'Játékok száma',
+          data: peakTimes,
+          borderColor: 'rgb(102, 126, 234)',
+          backgroundColor: 'rgba(102, 126, 234, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateBoardSizesChart(boardSizes) {
+  const ctx = document.getElementById('boardSizesChart');
+  if (!ctx) return;
+
+  const labels = Object.keys(boardSizes).map(size => `${size}x${size}`);
+  const data = Object.values(boardSizes);
+  
+  if (boardSizesChart) {
+    boardSizesChart.data.labels = labels;
+    boardSizesChart.data.datasets[0].data = data;
+    boardSizesChart.update();
+  } else {
+    boardSizesChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(255, 206, 86, 0.8)',
+            'rgba(75, 192, 192, 0.8)'
+          ],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateGameModesChart(gameModes) {
+  const ctx = document.getElementById('gameModesChart');
+  if (!ctx) return;
+
+  const modeLabels = {
+    'pvp': 'PvP',
+    'ai-easy': 'AI Easy',
+    'ai-medium': 'AI Medium',
+    'ai-hard': 'AI Hard',
+    'ai-vs-ai': 'AI vs AI'
+  };
+  
+  const labels = Object.keys(gameModes).map(mode => modeLabels[mode] || mode);
+  const data = Object.values(gameModes);
+  
+  if (gameModesChart) {
+    gameModesChart.data.labels = labels;
+    gameModesChart.data.datasets[0].data = data;
+    gameModesChart.update();
+  } else {
+    gameModesChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Játékok száma',
+          data: data,
+          backgroundColor: [
+            'rgba(102, 126, 234, 0.8)',
+            'rgba(118, 75, 162, 0.8)',
+            'rgba(237, 100, 166, 0.8)',
+            'rgba(255, 154, 158, 0.8)',
+            'rgba(250, 208, 196, 0.8)'
+          ],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateResultsChart(stats) {
+  const ctx = document.getElementById('resultsChart');
+  if (!ctx) return;
+
+  const data = [stats.playerWins || 0, stats.aiWins || 0, stats.draws || 0];
+  
+  if (resultsChart) {
+    resultsChart.data.datasets[0].data = data;
+    resultsChart.update();
+  } else {
+    resultsChart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: ['Játékos győzelem', 'AI győzelem', 'Döntetlen'],
+        datasets: [{
+          data: data,
+          backgroundColor: [
+            'rgba(75, 192, 192, 0.8)',
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(255, 206, 86, 0.8)'
+          ],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+  }
+}
+
+// Stats view chart functions (duplicates for separate canvas instances)
+function updateStatsPeakTimesChart(peakTimes) {
+  const ctx = document.getElementById('statsPeakTimesChart');
+  if (!ctx) return;
+
+  const hours = Array.from({length: 24}, (_, i) => `${i}:00`);
+
+  if (statsPeakTimesChart) {
+    statsPeakTimesChart.data.datasets[0].data = peakTimes;
+    statsPeakTimesChart.update();
+  } else {
+    statsPeakTimesChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: hours,
+        datasets: [{
+          label: 'Játékok száma',
+          data: peakTimes,
+          borderColor: 'rgb(102, 126, 234)',
+          backgroundColor: 'rgba(102, 126, 234, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateStatsBoardSizesChart(boardSizes) {
+  const ctx = document.getElementById('statsBoardSizesChart');
+  if (!ctx) return;
+
+  const data = [boardSizes['9'] || 0, boardSizes['13'] || 0, boardSizes['15'] || 0, boardSizes['19'] || 0];
+
+  if (statsBoardSizesChart) {
+    statsBoardSizesChart.data.datasets[0].data = data;
+    statsBoardSizesChart.update();
+  } else {
+    statsBoardSizesChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['9x9', '13x13', '15x15', '19x19'],
+        datasets: [{
+          data: data,
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(255, 206, 86, 0.8)',
+            'rgba(75, 192, 192, 0.8)'
+          ],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateStatsGameModesChart(gameModes) {
+  const ctx = document.getElementById('statsGameModesChart');
+  if (!ctx) return;
+
+  const labels = ['PvP', 'AI Könnyű', 'AI Közepes', 'AI Nehéz', 'AI vs AI'];
+  const data = [
+    gameModes['pvp'] || 0,
+    gameModes['ai-easy'] || 0,
+    gameModes['ai-medium'] || 0,
+    gameModes['ai-hard'] || 0,
+    gameModes['ai-vs-ai'] || 0
+  ];
+
+  if (statsGameModesChart) {
+    statsGameModesChart.data.labels = labels;
+    statsGameModesChart.data.datasets[0].data = data;
+    statsGameModesChart.update();
+  } else {
+    statsGameModesChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Játékok száma',
+          data: data,
+          backgroundColor: [
+            'rgba(102, 126, 234, 0.8)',
+            'rgba(118, 75, 162, 0.8)',
+            'rgba(237, 100, 166, 0.8)',
+            'rgba(255, 154, 158, 0.8)',
+            'rgba(250, 208, 196, 0.8)'
+          ],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateStatsResultsChart(stats) {
+  const ctx = document.getElementById('statsResultsChart');
+  if (!ctx) return;
+
+  const data = [stats.playerWins || 0, stats.aiWins || 0, stats.draws || 0];
+
+  if (statsResultsChart) {
+    statsResultsChart.data.datasets[0].data = data;
+    statsResultsChart.update();
+  } else {
+    statsResultsChart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: ['Játékos győzelem', 'AI győzelem', 'Döntetlen'],
+        datasets: [{
+          data: data,
+          backgroundColor: [
+            'rgba(75, 192, 192, 0.8)',
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(255, 206, 86, 0.8)'
+          ],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+  }
+}
+
+// Theme System
+let currentTheme = 'light';
+let currentBoardTheme = 'wood';
+let currentPieceColor = 'classic';
+
+// Get CSS variable value
+function getCSSVariable(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+// Load theme from localStorage
+function loadTheme() {
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  const savedBoardTheme = localStorage.getItem('boardTheme') || 'wood';
+  const savedPieceColor = localStorage.getItem('pieceColor') || 'classic';
+  
+  setTheme(savedTheme);
+  setBoardTheme(savedBoardTheme);
+  setPieceColor(savedPieceColor);
+}
+
+// Set main theme (dark/light)
+function setTheme(theme) {
+  currentTheme = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('theme', theme);
+
+  // Update all theme toggle buttons
+  const themeToggleBtns = [
+    document.getElementById('themeToggleBtn'),
+    document.getElementById('themeToggleBtnLobby'),
+    document.getElementById('themeToggleBtnGame')
+  ];
+  const icon = theme === 'dark' ? '☀️' : '🌓';
+  themeToggleBtns.forEach(btn => {
+    if (btn) {
+      btn.textContent = icon;
+    }
+  });
+
+  // Redraw board with new theme
+  if (gameState) {
+    drawBoard();
+  }
+}
+
+// Toggle dark/light mode
+function toggleTheme() {
+  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+  setTheme(newTheme);
+}
+
+// Set board theme
+function setBoardTheme(theme) {
+  currentBoardTheme = theme;
+  document.documentElement.setAttribute('data-board-theme', theme);
+  localStorage.setItem('boardTheme', theme);
+  
+  // Update active state
+  document.querySelectorAll('[data-board-theme]').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.querySelector(`[data-board-theme="${theme}"]`);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+  }
+  
+  // Redraw board
+  if (gameState) {
+    drawBoard();
+  }
+}
+
+// Set piece color scheme
+function setPieceColor(colorScheme) {
+  currentPieceColor = colorScheme;
+  document.documentElement.setAttribute('data-piece-color', colorScheme);
+  localStorage.setItem('pieceColor', colorScheme);
+  
+  // Update active state
+  document.querySelectorAll('[data-piece-color]').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.querySelector(`[data-piece-color="${colorScheme}"]`);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+  }
+  
+  // Redraw board
+  if (gameState) {
+    drawBoard();
+  }
+}
+
+// Get star positions based on board size
+function getStarPositions() {
+  if (BOARD_SIZE === 9) {
+    return [[2, 2], [2, 6], [6, 2], [6, 6], [4, 4]];
+  } else if (BOARD_SIZE === 13) {
+    return [[3, 3], [3, 9], [9, 3], [9, 9], [6, 6]];
+  } else if (BOARD_SIZE === 15) {
+    return [[3, 3], [3, 11], [11, 3], [11, 11], [7, 7]];
+  } else if (BOARD_SIZE === 19) {
+    return [[3, 3], [3, 9], [3, 15], [9, 3], [9, 9], [9, 15], [15, 3], [15, 9], [15, 15]];
+  }
+  return [];
+}
+
+// Initialize theme system
+function initThemeSystem() {
+  // Load saved theme
+  loadTheme();
+
+  // Theme toggle buttons (login, lobby, game)
+  const themeToggleBtns = [
+    document.getElementById('themeToggleBtn'),
+    document.getElementById('themeToggleBtnLobby'),
+    document.getElementById('themeToggleBtnGame')
+  ];
+  themeToggleBtns.forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', toggleTheme);
+    }
+  });
+
+  // Theme settings buttons (login, lobby, game)
+  const themeSettingsBtns = [
+    document.getElementById('themeSettingsBtn'),
+    document.getElementById('themeSettingsBtnLobby'),
+    document.getElementById('themeSettingsBtnGame')
+  ];
+  const themeModal = document.getElementById('themeModal');
+  const themeClose = themeModal?.querySelector('.theme-close');
+
+  themeSettingsBtns.forEach(btn => {
+    if (btn && themeModal) {
+      btn.addEventListener('click', () => {
+        themeModal.style.display = 'flex';
+      });
+    }
+  });
+
+  if (themeClose && themeModal) {
+    themeClose.addEventListener('click', () => {
+      themeModal.style.display = 'none';
+    });
+  }
+  
+  // Board theme buttons
+  document.querySelectorAll('[data-board-theme]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const theme = btn.getAttribute('data-board-theme');
+      setBoardTheme(theme);
+    });
+  });
+  
+  // Piece color buttons
+  document.querySelectorAll('[data-piece-color]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const colorScheme = btn.getAttribute('data-piece-color');
+      setPieceColor(colorScheme);
+    });
+  });
+  
+  // Close modal on outside click
+  window.addEventListener('click', (e) => {
+    if (e.target === themeModal) {
+      themeModal.style.display = 'none';
+    }
+  });
+}
+
+// Override drawBoard to use CSS variables
+const originalDrawBoard = drawBoard;
+drawBoard = function() {
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  // Get colors from CSS variables
+  const boardBg = getCSSVariable('--board-bg');
+  const boardLine = getCSSVariable('--board-line');
+  const boardStar = getCSSVariable('--board-star');
+
+  // Draw background with gradient for depth
+  const bgGradient = ctx.createLinearGradient(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  bgGradient.addColorStop(0, boardBg);
+  bgGradient.addColorStop(1, shadeColor(boardBg, -10));
+  ctx.fillStyle = bgGradient;
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  // Draw grid lines (at cell edges, not centers)
+  ctx.strokeStyle = boardLine;
+  ctx.lineWidth = 2;
+
+  for (let i = 0; i <= BOARD_SIZE; i++) {
+    // Vertical lines
+    ctx.beginPath();
+    ctx.moveTo(i * CELL_SIZE, 0);
+    ctx.lineTo(i * CELL_SIZE, CANVAS_SIZE);
+    ctx.stroke();
+
+    // Horizontal lines
+    ctx.beginPath();
+    ctx.moveTo(0, i * CELL_SIZE);
+    ctx.lineTo(CANVAS_SIZE, i * CELL_SIZE);
+    ctx.stroke();
+  }
+
+  // Draw star points in cell centers
+  ctx.fillStyle = boardStar;
+  const starPositions = getStarPositions();
+  starPositions.forEach(([row, col]) => {
+    const x = col * CELL_SIZE + CELL_SIZE / 2;
+    const y = row * CELL_SIZE + CELL_SIZE / 2;
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Draw pieces
+  if (gameState && gameState.board) {
+    for (let row = 0; row < BOARD_SIZE; row++) {
+      for (let col = 0; col < BOARD_SIZE; col++) {
+        const cell = gameState.board[row][col];
+        if (cell) {
+          const isWinningPiece = gameState.winningPieces &&
+            gameState.winningPieces.some(([r, c]) => r === row && c === col);
+          const isLastMove = gameState.lastMove &&
+            gameState.lastMove.row === row && gameState.lastMove.col === col;
+          drawPiece(row, col, cell, isWinningPiece, isLastMove);
+        }
+      }
+    }
+  }
+};
+
+// Helper function to shade color
+function shadeColor(color, percent) {
+  const num = parseInt(color.replace("#",""), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = (num >> 16) + amt;
+  const G = (num >> 8 & 0x00FF) + amt;
+  const B = (num & 0x0000FF) + amt;
+  return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 +
+    (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255))
+    .toString(16).slice(1);
+}
+
+// Override drawPiece to use CSS variables
+const originalDrawPiece = drawPiece;
+drawPiece = function(row, col, symbol, isWinning = false, isLastMove = false) {
+  const x = col * CELL_SIZE + CELL_SIZE / 2;
+  const y = row * CELL_SIZE + CELL_SIZE / 2;
+  const radius = CELL_SIZE * 0.4;
+
+  // Get piece colors from CSS variables
+  const player1Color = getCSSVariable('--piece-player1');
+  const player2Color = getCSSVariable('--piece-player2');
+  const shadowColor = getCSSVariable('--piece-shadow');
+
+  const pieceColor = symbol === 'X' ? player1Color : player2Color;
+
+  // Draw shadow
+  ctx.save();
+  ctx.shadowColor = shadowColor;
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetX = 3;
+  ctx.shadowOffsetY = 3;
+
+  // Draw piece with gradient
+  const gradient = ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.3, 0, x, y, radius);
+  gradient.addColorStop(0, lightenColor(pieceColor, 30));
+  gradient.addColorStop(1, pieceColor);
+  
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // Draw winning animation
+  if (isWinning) {
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Draw last move indicator
+  if (isLastMove && !isWinning) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+};
+
+// Helper function to lighten color
+function lightenColor(color, percent) {
+  const num = parseInt(color.replace("#",""), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = Math.min(255, (num >> 16) + amt);
+  const G = Math.min(255, (num >> 8 & 0x00FF) + amt);
+  const B = Math.min(255, (num & 0x0000FF) + amt);
+  return "#" + (0x1000000 + R*0x10000 + G*0x100 + B).toString(16).slice(1);
+}
+
+// Initialize theme system when page loads
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initThemeSystem);
+} else {
+  initThemeSystem();
+}
