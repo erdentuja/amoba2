@@ -684,12 +684,21 @@ function resetGame() {
 }
 
 // Timer functions
+let clientTimerEndTime = null;
+
 function startTimer() {
   stopTimer();
 
   timerInterval = setInterval(() => {
-    if (gameState && gameState.timerEnabled && gameState.timerRemaining !== null) {
-      updateTimerDisplay(gameState.timerRemaining);
+    if (gameState && gameState.timerEnabled && clientTimerEndTime) {
+      // Calculate remaining time from end time
+      const remaining = Math.max(0, Math.ceil((clientTimerEndTime - Date.now()) / 1000));
+      updateTimerDisplay(remaining);
+
+      // If time is up, stop the interval
+      if (remaining === 0) {
+        stopTimer();
+      }
     }
   }, 100); // Update every 100ms for smooth countdown
 }
@@ -854,12 +863,15 @@ function updateGameDisplay() {
 
   // Update timer
   if (gameState.timerEnabled && gameState.timerRemaining !== null) {
+    // Set the client-side timer end time based on server's remaining time
+    clientTimerEndTime = Date.now() + (gameState.timerRemaining * 1000);
     updateTimerDisplay(gameState.timerRemaining);
     if (!timerInterval) {
       startTimer();
     }
   } else {
     timerDiv.style.display = 'none';
+    clientTimerEndTime = null;
     stopTimer();
   }
 
