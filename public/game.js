@@ -203,6 +203,12 @@ function initSocketConnection() {
     socket.on('connect', () => {
       myPlayerId = socket.id;
       console.log('🔌 Socket connected! My ID:', myPlayerId);
+
+      // If user was logged in before, re-login automatically
+      if (isLoggedIn && myPlayerName) {
+        console.log('🔄 Auto re-login as:', myPlayerName);
+        socket.emit('login', { playerName: myPlayerName });
+      }
     });
 
     // Handle rooms list updates
