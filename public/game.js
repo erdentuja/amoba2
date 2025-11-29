@@ -348,6 +348,27 @@ function initSocketConnection() {
     });
 
     setupAdminListeners();
+
+    // Handle disconnect
+    socket.on('disconnect', (reason) => {
+      console.log('Disconnected from server:', reason);
+      // Show reconnecting message
+      if (isLoggedIn) {
+        showMessage('⚠️ Kapcsolat megszakadt... Újracsatlakozás...');
+      }
+    });
+
+    // Handle reconnect
+    socket.on('connect', () => {
+      console.log('Connected to server with ID:', socket.id);
+      myPlayerId = socket.id;
+
+      // If user was logged in before, re-login automatically
+      if (isLoggedIn && myPlayerName) {
+        console.log('Auto re-login as:', myPlayerName);
+        socket.emit('login', { playerName: myPlayerName });
+      }
+    });
   }
 }
 
