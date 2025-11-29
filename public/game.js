@@ -1019,6 +1019,7 @@ const timerDurationInput = document.getElementById('timerDuration');
 const saveTimerBtn = document.getElementById('saveTimerBtn');
 const aiVsAiEnabledCheckbox = document.getElementById('aiVsAiEnabled');
 const saveAIBtn = document.getElementById('saveAIBtn');
+const clearStatsBtn = document.getElementById('clearStatsBtn');
 
 // Admin modal controls
 adminLoginBtn.addEventListener('click', () => {
@@ -1071,6 +1072,12 @@ saveTimerBtn.addEventListener('click', () => {
 saveAIBtn.addEventListener('click', () => {
   const aiVsAiEnabled = aiVsAiEnabledCheckbox.checked;
   socket.emit('adminSetAISettings', { aiVsAiEnabled });
+});
+
+clearStatsBtn.addEventListener('click', () => {
+  if (confirm('Biztosan törölni szeretnéd az összes statisztikát? Ez a művelet nem vonható vissza!')) {
+    socket.emit('adminClearStats');
+  }
 });
 
 // Handle admin login response
@@ -1462,11 +1469,10 @@ function updateGameStats(stats) {
   document.getElementById('totalGames').textContent = stats.totalGames || 0;
   document.getElementById('activeGames').textContent = stats.activeGames || 0;
   document.getElementById('completedGames').textContent = stats.totalGamesCompleted || 0;
-  
-  // Calculate AI win rate
-  const totalFinished = stats.playerWins + stats.aiWins;
-  const aiWinRate = totalFinished > 0 ? Math.round((stats.aiWins / totalFinished) * 100) : 0;
-  document.getElementById('aiWinRate').textContent = aiWinRate + '%';
+  const playerWinsEl = document.getElementById('playerWins');
+  if (playerWinsEl) {
+    playerWinsEl.textContent = stats.playerWins || 0;
+  }
 
   // Update charts
   updatePeakTimesChart(stats.peakTimes);

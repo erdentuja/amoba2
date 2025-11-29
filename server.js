@@ -1492,6 +1492,37 @@ io.on('connection', (socket) => {
     console.log('AI settings updated:', globalAISettings);
   });
 
+  // Admin: Clear statistics
+  socket.on('adminClearStats', () => {
+    const client = connectedClients.get(socket.id);
+    if (!client || !client.isAdmin) {
+      socket.emit('error', 'Unauthorized');
+      return;
+    }
+
+    // Reset all stats to default
+    gameStats = {
+      totalGames: 0,
+      totalGamesCompleted: 0,
+      activeGames: 0,
+      peakTimes: Array(24).fill(0),
+      boardSizes: { '9': 0, '13': 0, '15': 0, '19': 0 },
+      gameModes: { 'pvp': 0, 'ai-easy': 0, 'ai-medium': 0, 'ai-hard': 0, 'ai-vs-ai': 0 },
+      playerWins: 0,
+      aiWins: 0,
+      draws: 0
+    };
+
+    // Save cleared stats to file
+    saveStats().catch(err => console.error('Failed to save cleared stats:', err));
+
+    // Broadcast updated stats to all admins
+    broadcastStatsToAdmins();
+
+    console.log('📊 Statistics cleared by admin');
+    socket.emit('message', 'Statisztikák törölve!');
+  });
+
   // Handle stats request (for public statistics view)
   socket.on('requestStats', () => {
     socket.emit('gameStats', gameStats);
