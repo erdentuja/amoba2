@@ -499,11 +499,11 @@ function updateRoomsList(rooms) {
     // Action buttons
     let actionButtons = '';
     if (room.status === 'waiting') {
-      actionButtons = `<button class="btn btn-primary" onclick="joinExistingRoom('${room.roomId}')">Csatlakozás</button>`;
-      // Add delete button only for creator
-      if (isCreator) {
-        actionButtons += ` <button class="btn btn-danger" onclick="deleteMyRoom('${room.roomId}')" style="margin-left: 10px;">🗑️ Törlés</button>`;
-      }
+      const joinBtn = `<button class="btn btn-primary" onclick="joinExistingRoom('${room.roomId}')" style="width: auto; flex: 1;">Csatlakozás</button>`;
+      const deleteBtn = isCreator
+        ? `<button class="btn btn-danger" onclick="deleteMyRoom('${room.roomId}')" style="width: auto;">🗑️ Törlés</button>`
+        : '';
+      actionButtons = `<div style="display: flex; gap: 10px; margin-top: 10px;">${joinBtn}${deleteBtn}</div>`;
     } else {
       actionButtons = `<button class="btn btn-secondary" onclick="watchGame('${room.roomId}')">👁️ Megnézem (${room.spectatorCount || 0} néző)</button>`;
     }
